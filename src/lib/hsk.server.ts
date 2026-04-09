@@ -1,9 +1,10 @@
 import type { HskWord } from "@/lib/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function getRandomWord(): Promise<HskWord> {
+export async function getRandomWord(maxLevel = 9): Promise<HskWord> {
   const supabase = await createSupabaseServerClient();
-  const level = 1 + Math.floor(Math.random() * 9);
+  const clampedMax = Math.min(9, Math.max(1, Math.floor(maxLevel)));
+  const level = 1 + Math.floor(Math.random() * clampedMax);
 
   const { count, error: countError } = await supabase
     .from("hsk_words")

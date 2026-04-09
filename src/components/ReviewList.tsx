@@ -57,18 +57,17 @@ export function ReviewList({
   }, [refreshKey]);
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-black">
+    <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_60px_rgba(0,0,0,0.06)]">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Review List</div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400">Words you missed or marked “I don’t know”.</div>
+          <div className="text-sm font-semibold text-zinc-900">Review List</div>
+          <div className="text-xs text-zinc-500">Words you missed or marked “I don’t know”.</div>
         </div>
-        <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{rows.length}</div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-white/10">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:bg-white/5 dark:text-zinc-400">
+      <div className="overflow-hidden rounded-2xl border border-zinc-200">
+        <table className="w-full text-left text-base">
+          <thead className="bg-zinc-50 text-sm font-semibold uppercase tracking-wide text-zinc-500">
             <tr>
               <th className="px-3 py-2">HSK</th>
               <th className="px-3 py-2">Hanzi</th>
@@ -79,17 +78,17 @@ export function ReviewList({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-zinc-500 dark:text-zinc-400">
+                <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
                   Nothing here yet. Keep going.
                 </td>
               </tr>
             ) : (
               rows.map((r) => (
-                <tr key={`${r.word.id}:${r.last_seen}`} className="border-t border-zinc-200 dark:border-white/10">
-                  <td className="px-3 py-2 text-zinc-500 dark:text-zinc-400">{r.word.level}</td>
-                  <td className="px-3 py-2 font-semibold text-zinc-900 dark:text-zinc-50">{r.word.hanzi}</td>
-                  <td className="px-3 py-2 text-zinc-700 dark:text-zinc-200">{r.word.pinyin}</td>
-                  <td className="px-3 py-2 text-zinc-700 dark:text-zinc-200">{r.word.english}</td>
+                <tr key={`${r.word.id}:${r.last_seen}`} className="border-t border-zinc-200">
+                  <td className="px-3 py-2 text-zinc-500">{r.word.level}</td>
+                  <td className="px-3 py-2 font-semibold text-zinc-900">{r.word.hanzi}</td>
+                  <td className="px-3 py-2 text-zinc-700">{r.word.pinyin}</td>
+                  <td className="px-3 py-2 text-zinc-700">{r.word.english}</td>
                 </tr>
               ))
             )}

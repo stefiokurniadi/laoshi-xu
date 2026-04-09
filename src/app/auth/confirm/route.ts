@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
 
-  if (code) {
+  const token_hash = requestUrl.searchParams.get("token_hash");
+  const type = requestUrl.searchParams.get("type");
+  const next = requestUrl.searchParams.get("next") ?? "/";
+
+  if (token_hash && type) {
     const cookieStore = await cookies();
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseKey =
@@ -23,9 +26,14 @@ export async function GET(request: Request) {
       },
     });
 
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.verifyOtp({ type: type as never, token_hash });
+    if (error) {
+      return NextResponse.redirect(
+        new URL(`/?authError=${encodeURIComponent(error.message)}`, requestUrl.origin),
+      );
+    }
   }
 
-  return NextResponse.redirect(new URL("/", requestUrl.origin));
+  return NextResponse.redirect(new URL(next, requestUrl.origin));
 }
 

@@ -24,11 +24,18 @@ export function FlashcardShellClient({
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   return (
-    <div className="flex min-h-[100svh] flex-col">
+    <div className="relative flex min-h-[100svh] flex-col overflow-hidden bg-gradient-to-b from-white via-white to-zinc-50">
+      <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-200/60 via-fuchsia-200/40 to-amber-200/40 blur-3xl" />
       <Navbar email={email} score={score} scoreDelta={delta} />
 
-      <div className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-1 gap-6 px-5 py-8 lg:grid-cols-[1.25fr_0.9fr]">
-        <div className="flex flex-col gap-6">
+      <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">
+        <div className="mb-6">
+          <div className="text-sm font-semibold text-zinc-900">Daily practice</div>
+          <div className="mt-1 text-sm text-zinc-500">Answer fast, review mistakes, level up your HSK.</div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.85fr]">
+          <div className="flex flex-col gap-6">
           <FlashcardGame
             initialScore={score}
             onScoreChange={(nextScore, d) => {
@@ -38,10 +45,11 @@ export function FlashcardShellClient({
             }}
             onReviewChange={() => setReviewRefreshKey((k) => k + 1)}
           />
-        </div>
+          </div>
 
-        <div className="flex flex-col gap-6">
-          <ReviewList initialRows={initialReviewRows} userId={userId} refreshKey={reviewRefreshKey} />
+          <div className="flex flex-col gap-6">
+            <ReviewList initialRows={initialReviewRows} userId={userId} refreshKey={reviewRefreshKey} />
+          </div>
         </div>
       </div>
     </div>

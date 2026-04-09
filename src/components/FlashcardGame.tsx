@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { HskWord, Option, QuestionMode } from "@/lib/types";
-import { buildOptions, getAnswerText, getPrompt, rotateMode, scoreDelta, shuffle } from "@/lib/game";
+import { buildOptions, getAnswerText, getPrompt, rotateMode, scoreDelta } from "@/lib/game";
 import { incrementPoints } from "@/app/actions/profile";
 import { removeFailedWord, upsertFailedWord } from "@/app/actions/review";
 
@@ -26,9 +26,16 @@ export function FlashcardGame({
   const [source, setSource] = useState<"hsk" | "review">("hsk");
 
   const scoreRef = useRef(initialScore);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     scoreRef.current = initialScore;
   }, [initialScore]);
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -99,10 +106,11 @@ export function FlashcardGame({
         onScoreChange(scoreRef.current, 0);
       }
 
-      // Auto-advance after a short reveal (keeps UI minimal without a Next button).
-      window.setTimeout(() => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = setTimeout(() => {
+        advanceTimerRef.current = null;
         void load();
-      }, 900);
+      }, 2000);
     },
     [busy, load, mode, onReviewChange, onScoreChange, reveal, word],
   );
@@ -110,11 +118,14 @@ export function FlashcardGame({
   const correctAnswerText = useMemo(() => (word && mode ? getAnswerText(mode, word) : ""), [mode, word]);
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-black">
+    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_60px_rgba(0,0,0,0.06)]">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             {word ? `HSK ${word.level}` : "Loading"}
+          </div>
+          <div className="mt-1 text-sm font-semibold text-zinc-900">
+            {source === "review" ? "Review" : "New word"}
           </div>
         </div>
       </div>
@@ -128,17 +139,26 @@ export function FlashcardGame({
           transition={{ duration: 0.22 }}
           className="space-y-4"
         >
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-white/10 dark:bg-white/5">
-            <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{prompt?.label ?? "…"}</div>
-            <div className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <div className="rounded-3xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-6">
+            <div className="text-xs font-semibold text-zinc-500">{prompt?.label ?? "…"}</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
               {prompt?.value ?? "Loading…"}
             </div>
 
-            {reveal && (
-              <div className="mt-3 text-sm text-zinc-600 dark:text-zinc-300">
-                <span className="font-semibold text-zinc-900 dark:text-zinc-50">Answer:</span> {correctAnswerText}
-              </div>
-            )}
+            <div
+              className="mt-3 min-h-[2.5rem] text-base leading-snug text-zinc-600"
+              aria-live="polite"
+            >
+              {reveal ? (
+                <>
+                  <span className="font-semibold text-zinc-900">Answer:</span> {correctAnswerText}
+                </>
+              ) : (
+                <span className="invisible block select-none" aria-hidden>
+                  Answer:
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -158,20 +178,20 @@ export function FlashcardGame({
               const showState = Boolean(reveal);
 
               const base =
-                "w-full rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors disabled:opacity-60";
+                "w-full rounded-2xl border px-4 py-4 text-left text-base font-semibold transition-colors shadow-sm disabled:cursor-default disabled:opacity-100";
 
               const dontKnowStyle =
                 opt.kind === "dontKnow"
-                  ? "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 dark:hover:bg-amber-500/15"
-                  : "border-zinc-200 bg-zinc-50 text-zinc-900 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/5 dark:text-zinc-50 dark:hover:bg-white/10";
+                  ? "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
+                  : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50";
 
               const revealedStyle = !showState
                 ? ""
                 : isCorrectWord
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-100"
+                  ? "z-[1] border-emerald-600 bg-emerald-100 text-emerald-950 ring-2 ring-emerald-500/40"
                   : isPicked
-                    ? "border-rose-500 bg-rose-50 text-rose-900 dark:bg-rose-500/15 dark:text-rose-100"
-                    : "opacity-70";
+                    ? "z-[1] border-rose-600 bg-rose-100 text-rose-950 ring-2 ring-rose-500/40"
+                    : "opacity-45";
 
               return (
                 <button
@@ -191,21 +211,8 @@ export function FlashcardGame({
           </div>
 
           {reveal && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                Tip: “I don’t know” adds it to your review list without penalty.
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    // quick reshuffle to reduce patterning
-                    setOptions((o) => shuffle(o));
-                  }}
-                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 dark:border-white/10 dark:bg-black dark:text-zinc-50 dark:hover:bg-white/10"
-                >
-                  Shuffle
-                </button>
-              </div>
+            <div className="text-sm text-zinc-500">
+              Tip: “I don’t know” adds it to your review list without penalty.
             </div>
           )}
         </motion.div>

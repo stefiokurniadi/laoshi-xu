@@ -7,9 +7,13 @@ export async function signUpWithEmail(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
   if (!email || !password) {
     redirect("/?authError=Missing%20email%20or%20password");
+  }
+  if (passwordConfirm && password !== passwordConfirm) {
+    redirect("/?authError=Passwords%20do%20not%20match");
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -17,7 +21,8 @@ export async function signUpWithEmail(formData: FormData) {
     email,
     password,
     options: {
-      emailRedirectTo: origin,
+      // If confirmations are enabled, send the user to a page that verifies and creates a session.
+      emailRedirectTo: `${origin}/auth/confirm`,
     },
   });
 
