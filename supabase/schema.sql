@@ -1,0 +1,106 @@
+-- Supabase schema for Mandarin Learning Web App
+
+-- 1) Profiles
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text unique,
+  total_points integer not null default 0
+);
+
+alter table public.profiles enable row level security;
+
+create policy "profiles_select_own"
+on public.profiles
+for select
+using (auth.uid() = id);
+
+create policy "profiles_insert_own"
+on public.profiles
+for insert
+with check (auth.uid() = id);
+
+create policy "profiles_update_own"
+on public.profiles
+for update
+using (auth.uid() = id)
+with check (auth.uid() = id);
+
+-- 2) HSK words
+create table if not exists public.hsk_words (
+  id bigint generated always as identity primary key,
+  hanzi text not null,
+  pinyin text not null,
+  english text not null,
+  level smallint not null check (level between 1 and 9)
+);
+
+create index if not exists hsk_words_level_idx on public.hsk_words(level);
+
+alter table public.hsk_words enable row level security;
+
+-- Public read-only word list
+create policy "hsk_words_select_all"
+on public.hsk_words
+for select
+using (true);
+
+-- 3) Failed words (review list)
+create table if not exists public.failed_words (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  word_id bigint not null references public.hsk_words(id) on delete cascade,
+  last_seen timestamptz not null default now(),
+  primary key (user_id, word_id)
+);
+
+create index if not exists failed_words_user_id_last_seen_idx
+on public.failed_words(user_id, last_seen desc);
+
+alter table public.failed_words enable row level security;
+
+create policy "failed_words_select_own"
+on public.failed_words
+for select
+using (auth.uid() = user_id);
+
+create policy "failed_words_insert_own"
+on public.failed_words
+for insert
+with check (auth.uid() = user_id);
+
+create policy "failed_words_update_own"
+on public.failed_words
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "failed_words_delete_own"
+on public.failed_words
+for delete
+using (auth.uid() = user_id);
+
+-- 4) Atomic point increments (avoid races)
+create or replace function public.increment_total_points(delta integer)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_total integer;
+begin
+  update public.profiles
+  set total_points = total_points + delta
+  where id = auth.uid()
+  returning total_points into new_total;
+
+  if new_total is null then
+    raise exception 'profile not found for user %', auth.uid();
+  end if;
+
+  return new_total;
+end;
+$$;
+
+revoke all on function public.increment_total_points(integer) from public;
+grant execute on function public.increment_total_points(integer) to authenticated;
+

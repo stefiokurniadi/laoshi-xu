@@ -1,0 +1,14 @@
+export type HskWord = {
+  id: number;
+  hanzi: string;
+  pinyin: string;
+  english: string;
+  level: number;
+};
+
+export type QuestionMode = "EN_TO_ZH" | "HZ_TO_EN" | "PY_TO_MIX";
+
+export type Option =
+  | { kind: "word"; word: HskWord }
+  | { kind: "dontKnow" };
+
