@@ -28,9 +28,9 @@ export function FlashcardShellClient({
         className="pointer-events-none absolute -top-28 left-1/2 h-[22rem] w-[min(44rem,100vw)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_80%_60%_at_50%_30%,rgba(26,81,86,0.13),transparent_70%)] blur-3xl"
         aria-hidden
       />
-      <Navbar email={email} score={score} scoreDelta={delta} />
+      <Navbar email={email} score={score} scoreDelta={delta} leaderboardUserId={userId} />
 
-      <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-6">
+      <div className="relative z-0 mx-auto w-full max-w-6xl flex-1 px-5 py-6">
         <div className="mb-6">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -38,7 +38,9 @@ export function FlashcardShellClient({
                 MISSION: Gain more points & Level up
               </div>
             </div>
-            <LeaderboardLauncher userId={userId} />
+            <div className="hidden sm:block sm:shrink-0">
+              <LeaderboardLauncher userId={userId} />
+            </div>
           </div>
         </div>
 

@@ -6,19 +6,32 @@ import { getLeaderboardSnapshot } from "@/app/actions/leaderboard";
 import { isGapRow, type LeaderboardRow } from "@/lib/leaderboard";
 import { playerRatingLabel } from "@/lib/rating";
 
-export function LeaderboardLauncher({ userId }: { userId: string }) {
+export function LeaderboardLauncher({
+  userId,
+  variant = "default",
+}: {
+  userId: string;
+  /** `icon` = trophy-only (e.g. mobile navbar next to Point). */
+  variant?: "default" | "icon";
+}) {
   const [open, setOpen] = useState(false);
   const dialogTitleId = useId();
+
+  const buttonClassName =
+    variant === "icon"
+      ? "inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm transition-colors hover:bg-[#164448]"
+      : "inline-flex shrink-0 items-center gap-2 rounded-xl border border-black/10 bg-[#1a5156] px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#164448] sm:px-3.5 sm:py-2 sm:text-sm";
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-black/10 bg-[#1a5156] px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#164448] sm:px-3.5 sm:py-2 sm:text-sm"
+        className={buttonClassName}
+        aria-label={variant === "icon" ? "Leaderboard" : undefined}
       >
-        <Trophy className="h-4 w-4 text-amber-300" aria-hidden />
-        Leaderboard
+        <Trophy className="h-4 w-4 shrink-0 text-amber-300" aria-hidden />
+        {variant === "default" ? "Leaderboard" : null}
       </button>
       {open ? (
         <LeaderboardModal

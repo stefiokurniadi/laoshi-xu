@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { signOut } from "@/app/actions/auth";
 import { BrandLogo } from "@/components/BrandLogo";
+import { LeaderboardLauncher } from "@/components/LeaderboardLauncher";
 import { playerRatingLabel } from "@/lib/rating";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -15,12 +16,15 @@ export function Navbar({
   score,
   scoreDelta,
   loginHref,
+  leaderboardUserId,
 }: {
   email?: string | null;
   score: number;
   scoreDelta: number | null;
   /** When set and the user is not signed in, show a Log in control (e.g. on the public homepage). */
   loginHref?: string;
+  /** Logged-in home: show trophy-only leaderboard on small screens (next to Point). */
+  leaderboardUserId?: string | null;
 }) {
   const deltaColor = scoreDelta == null ? null : scoreDelta > 0 ? "bg-emerald-500" : scoreDelta < 0 ? "bg-rose-500" : "bg-zinc-500";
   const deltaText = useMemo(() => {
@@ -115,7 +119,7 @@ export function Navbar({
   }, [email, newPw, newPwConfirm, oldPw]);
 
   return (
-    <div className="w-full bg-[#f0f6f7]/90 backdrop-blur-md">
+    <div className="relative z-40 w-full bg-[#f0f6f7]/90 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
         <Link
           href="/"
@@ -161,7 +165,13 @@ export function Navbar({
             </div>
           ) : null}
 
-          <div className="inline-flex h-10 min-h-10 shrink-0 items-center gap-2 rounded-full border border-black/10 bg-[#1a5156] px-4 text-sm font-medium text-white shadow-sm">
+          {email && leaderboardUserId ? (
+            <div className="sm:hidden">
+              <LeaderboardLauncher userId={leaderboardUserId} variant="icon" />
+            </div>
+          ) : null}
+
+          <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 bg-[#1a5156] px-2.5 text-sm font-medium text-white shadow-sm sm:gap-2 sm:px-4">
             <span className="text-white/100">{pointLabel}</span>
             <motion.span
               key={score}
@@ -192,7 +202,7 @@ export function Navbar({
               <button
                 type="button"
                 onClick={() => setAccountOpen((v) => !v)}
-                className="inline-flex h-10 min-h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] text-white shadow-sm hover:bg-[#164448] sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
+                className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] sm:aspect-auto sm:h-10 sm:max-h-none sm:max-w-none sm:min-h-10 sm:min-w-0 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
                 aria-label="My profile"
@@ -252,7 +262,7 @@ export function Navbar({
           ) : loginHref ? (
             <Link
               href={loginHref}
-              className="inline-flex h-10 min-h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] text-white shadow-sm hover:bg-[#164448] sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
+              className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] sm:aspect-auto sm:h-10 sm:max-h-none sm:max-w-none sm:min-h-10 sm:min-w-0 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
             >
               <LogIn className="h-[1.125rem] w-[1.125rem] shrink-0 sm:hidden" strokeWidth={2} aria-hidden />
               <span className="hidden sm:inline">Login for Free</span>

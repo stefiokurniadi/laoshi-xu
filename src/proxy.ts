@@ -1,7 +1,13 @@
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { checkApiWordRateLimit } from "@/lib/rateLimit";
 import { createClient } from "@/utils/supabase/middleware";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  const limited = await checkApiWordRateLimit(request);
+  if (!limited.ok) {
+    return NextResponse.json({ error: limited.message }, { status: 429 });
+  }
   return createClient(request);
 }
 

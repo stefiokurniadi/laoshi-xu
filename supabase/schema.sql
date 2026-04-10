@@ -361,3 +361,23 @@ using (true);
 
 -- Populate with `supabase/anon_demo_words_seed.sql` after `hsk_words` exists.
 
+-- 9) Global app settings (singleton row; updates via service role from server actions only)
+create table if not exists public.app_settings (
+  id smallint primary key default 1 check (id = 1),
+  google_login_enabled boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.app_settings (id, google_login_enabled) values (1, true)
+on conflict (id) do nothing;
+
+alter table public.app_settings enable row level security;
+
+create policy "app_settings_select_all"
+on public.app_settings
+for select
+to anon, authenticated
+using (true);
+
+-- No insert/update/delete policies: clients read only; writes use service_role in Next.js.
+
