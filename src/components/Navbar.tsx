@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { signOut } from "@/app/actions/auth";
 import { BrandLogo } from "@/components/BrandLogo";
+import { playerRatingLabel } from "@/lib/rating";
 
 export function Navbar({
   email,
@@ -23,6 +24,8 @@ export function Navbar({
     return `${scoreDelta}`;
   }, [scoreDelta]);
 
+  const ratingLabel = useMemo(() => playerRatingLabel(score), [score]);
+
   return (
     <div className="w-full border-b border-zinc-200/70 bg-white/70 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
@@ -38,12 +41,20 @@ export function Navbar({
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
           {email ? (
-            <span
-              className="min-w-0 max-w-[min(42vw,9rem)] shrink truncate text-xs text-zinc-600 sm:max-w-[14rem] sm:text-sm md:max-w-[18rem]"
-              title={email}
-            >
-              {email}
-            </span>
+            <div className="flex min-w-0 max-w-[min(46vw,10rem)] shrink flex-col items-end text-right sm:max-w-[15rem] md:max-w-[20rem]">
+              <span
+                className="w-full truncate text-xs text-zinc-600 sm:text-sm"
+                title={email}
+              >
+                {email}
+              </span>
+              <span
+                className="mt-0.5 w-full truncate text-[10px] font-medium text-zinc-500 sm:text-xs"
+                title={ratingLabel}
+              >
+                {ratingLabel}
+              </span>
+            </div>
           ) : null}
 
           <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 shadow-sm">

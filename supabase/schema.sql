@@ -230,3 +230,106 @@ $$;
 revoke all on function public.increment_total_points(integer) from public;
 grant execute on function public.increment_total_points(integer) to authenticated;
 
+-- Leaderboard: top 20 by points; emails masked in RPC (first 3 chars + ***), except the caller’s own row.
+create or replace function public.get_leaderboard_snapshot()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  viewer uuid := auth.uid();
+  top_rows jsonb;
+  viewer_in_top boolean;
+  v_rank bigint;
+  v_points int;
+  v_email text;
+  gap_hidden int;
+begin
+  if viewer is null then
+    raise exception 'not authenticated';
+  end if;
+
+  select a, b
+  into top_rows, viewer_in_top
+  from (
+    with ranked as (
+      select
+        p.id,
+        p.email,
+        p.total_points,
+        row_number() over (order by p.total_points desc, p.id asc) as rnk
+      from public.profiles p
+    ),
+    top20 as (
+      select * from ranked where rnk <= 20
+    )
+    select
+      coalesce(
+        (
+          select jsonb_agg(
+            jsonb_build_object(
+              'rank', t.rnk,
+              'profileId', t.id::text,
+              'displayEmail',
+                case
+                  when t.id = viewer then coalesce(t.email, '')
+                  else left(coalesce(t.email, ''), 3) || '***'
+                end,
+              'totalPoints', t.total_points,
+              'isViewer', t.id = viewer
+            )
+            order by t.rnk
+          )
+          from top20 t
+        ),
+        '[]'::jsonb
+      ) as a,
+      exists (select 1 from top20 x where x.id = viewer) as b
+  ) as _row;
+
+  if viewer_in_top then
+    return jsonb_build_object('rows', top_rows, 'showGap', false);
+  end if;
+
+  select r.rnk, r.total_points, r.email
+  into v_rank, v_points, v_email
+  from (
+    select
+      p.id,
+      p.email,
+      p.total_points,
+      row_number() over (order by p.total_points desc, p.id asc) as rnk
+    from public.profiles p
+  ) r
+  where r.id = viewer;
+
+  if v_rank is null then
+    return jsonb_build_object('rows', top_rows, 'showGap', false);
+  end if;
+
+  gap_hidden := greatest(0, v_rank::int - 20 - 1);
+
+  return jsonb_build_object(
+    'rows',
+    top_rows
+      || jsonb_build_array(
+           jsonb_build_object('type', 'gap', 'hiddenCount', gap_hidden)
+         )
+      || jsonb_build_array(
+           jsonb_build_object(
+             'rank', v_rank,
+             'profileId', viewer::text,
+             'displayEmail', coalesce(v_email, ''),
+             'totalPoints', v_points,
+             'isViewer', true
+           )
+         ),
+    'showGap', true
+  );
+end;
+$$;
+
+revoke all on function public.get_leaderboard_snapshot() from public;
+grant execute on function public.get_leaderboard_snapshot() to authenticated;
+

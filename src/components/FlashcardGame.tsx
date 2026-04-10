@@ -22,6 +22,13 @@ import {
 
 type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "review" };
 
+const AFTER_ANSWER_TIPS = [
+  "Tip: Consecutive correct answers get more points",
+  "Tip: I don't know quota refill after midnight",
+  "Tip: Review list will change colour if you make the same mistakes",
+  "Tip: If you got HSK 1 wrong, -9 points!",
+] as const;
+
 export function FlashcardGame({
   userId,
   initialScore,
@@ -39,6 +46,7 @@ export function FlashcardGame({
   const [options, setOptions] = useState<Option[]>([]);
   const [busy, setBusy] = useState(false);
   const [reveal, setReveal] = useState<null | { correctId: number; pickedKey: string }>(null);
+  const [afterAnswerTipIndex, setAfterAnswerTipIndex] = useState(0);
   const [source, setSource] = useState<"hsk" | "review">("hsk");
 
   const scoreRef = useRef(initialScore);
@@ -138,6 +146,7 @@ export function FlashcardGame({
       if (!word || !mode || busy || reveal) return;
       if (opt.kind !== "word") return;
       const pickedKey = `word:${opt.word.id}`;
+      setAfterAnswerTipIndex(Math.floor(Math.random() * AFTER_ANSWER_TIPS.length));
       setReveal({ correctId: word.id, pickedKey });
 
       const isCorrect = opt.word.id === word.id;
@@ -207,6 +216,7 @@ export function FlashcardGame({
 
     setIdkRemaining(rem);
 
+    setAfterAnswerTipIndex(Math.floor(Math.random() * AFTER_ANSWER_TIPS.length));
     setReveal({ correctId: word.id, pickedKey: "dontKnow" });
     correctStreakRef.current = 0;
 
@@ -356,12 +366,7 @@ export function FlashcardGame({
           </div>
 
           {reveal && (
-            <div className="text-sm text-zinc-500">
-              Tip: Score includes your word level plus a streak bonus (+1 on your 2nd correct in a row, +2 on
-              the 3rd, …). Wrong answers reset the streak. “I don’t know” adds the word to review without losing
-              points (3 uses per day on your account, by your device’s local calendar date; resets after
-              midnight).
-            </div>
+            <div className="text-sm text-zinc-500">{AFTER_ANSWER_TIPS[afterAnswerTipIndex]}</div>
           )}
         </motion.div>
       </AnimatePresence>

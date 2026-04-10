@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReviewListRow } from "@/lib/types";
 import { Navbar } from "@/components/Navbar";
 import { FlashcardGame } from "@/components/FlashcardGame";
+import { LeaderboardLauncher } from "@/components/LeaderboardLauncher";
 import { ReviewList } from "@/components/ReviewList";
 
 export function FlashcardShellClient({
@@ -27,9 +28,12 @@ export function FlashcardShellClient({
       <Navbar email={email} score={score} scoreDelta={delta} />
 
       <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">
-        <div className="mb-6">
-          <div className="text-sm font-semibold text-zinc-900">Daily practice</div>
-          <div className="mt-1 text-sm text-zinc-500">Answer fast, review mistakes, level up your HSK.</div>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-zinc-900">Daily practice</div>
+            <div className="mt-1 text-sm text-zinc-500">Answer fast, review mistakes, level up your HSK.</div>
+          </div>
+          <LeaderboardLauncher userId={userId} />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.85fr]">
