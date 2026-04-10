@@ -19,8 +19,16 @@ import {
   IDK_DAILY_LIMIT,
   localDateKey,
 } from "@/lib/idkQuota";
+import {
+  GUEST_DEMO_MAX_TRIALS,
+  GUEST_DEMO_ROUND_KEY,
+  GUEST_DEMO_SCORE_KEY,
+  GUEST_DEMO_TRIALS_KEY,
+  GUEST_DEMO_VOCAB_TIER_KEY,
+} from "@/lib/guestDemo";
+import Link from "next/link";
 
-type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "review" };
+type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "review" | "demo" };
 
 const AFTER_ANSWER_TIPS = [
   "Tip: Consecutive correct answers get more points",
@@ -29,28 +37,50 @@ const AFTER_ANSWER_TIPS = [
   "Tip: If you got HSK 1 wrong, -9 points!",
 ] as const;
 
+const DEMO_AFTER_ANSWER_TIPS = [
+  "Tip: Consecutive correct answers get more points",
+  "Tip: Sign in to save your score and unlock the full word list",
+  "Tip: If you got HSK 1 wrong, -9 points!",
+  "Tip: Guest play uses a curated HSK 1–4 demo set",
+] as const;
+
 export function FlashcardGame({
   userId,
   initialScore,
   onScoreChange,
   onReviewChange,
+  demo,
 }: {
-  userId: string;
+  userId?: string;
   initialScore: number;
   onScoreChange: (nextScore: number, delta: number) => void;
   /** Called after review list mutations so the sidebar can refetch without relying on Realtime alone. */
   onReviewChange?: () => void;
+  /** Guest trial: local points only, separate word API, capped rounds. */
+  demo?: { fetchPath: string };
 }) {
-  const roundStorageKey = useMemo(() => `laoshi-xu:flashcardGame:round:${userId}`, [userId]);
+  if (!demo && !userId) {
+    throw new Error("FlashcardGame requires userId unless demo mode is enabled.");
+  }
+
+  const roundStorageKey = useMemo(
+    () => (demo ? GUEST_DEMO_ROUND_KEY : `laoshi-xu:flashcardGame:round:${userId}`),
+    [demo, userId],
+  );
   const [mode, setMode] = useState<QuestionMode | null>(null);
   const [word, setWord] = useState<HskWord | null>(null);
   const [options, setOptions] = useState<Option[]>([]);
   const [busy, setBusy] = useState(false);
   const [reveal, setReveal] = useState<null | { correctId: number; pickedKey: string }>(null);
   const [afterAnswerTipIndex, setAfterAnswerTipIndex] = useState(0);
-  const [source, setSource] = useState<"hsk" | "review">("hsk");
+  const [source, setSource] = useState<"hsk" | "review" | "demo">("hsk");
+  const [trialLimitReached, setTrialLimitReached] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const scoreRef = useRef(initialScore);
+  const trialsUsedRef = useRef(0);
+  /** Guest-only: sent as `vocabTier` on `/api/word/demo`; increases on “Retry” after 10 rounds. */
+  const guestVocabTierRef = useRef(0);
   const correctStreakRef = useRef(0);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Next round fetched in the background while the answer is visible (1.4s). */
@@ -66,7 +96,7 @@ export function FlashcardGame({
         mode: QuestionMode;
         word: HskWord;
         options: Option[];
-        source: "hsk" | "review";
+        source: "hsk" | "review" | "demo";
         reveal: null | { correctId: number; pickedKey: string };
         afterAnswerTipIndex: number;
         savedAt: number;
@@ -106,13 +136,17 @@ export function FlashcardGame({
   }, [afterAnswerTipIndex, mode, options, reveal, roundStorageKey, source, word]);
 
   const syncIdkFromServer = useCallback(async () => {
+    if (demo) {
+      setIdkRemaining(0);
+      return;
+    }
     try {
       const r = await fetchIdkRemaining(localDateKey());
       setIdkRemaining(r);
     } catch {
-      setIdkRemaining(getIdkRemainingLocal(userId));
+      setIdkRemaining(getIdkRemainingLocal(userId!));
     }
-  }, [userId]);
+  }, [demo, userId]);
 
   useEffect(() => {
     void syncIdkFromServer();
@@ -132,7 +166,7 @@ export function FlashcardGame({
     };
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (loadOpts?: { resetMode?: boolean }) => {
     setReveal(null);
 
     const pending = pendingNextRef.current;
@@ -144,7 +178,7 @@ export function FlashcardGame({
         setMode(nextMode);
         setWord(payload.word);
         setOptions(buildOptions(payload.word, payload.distractors));
-        setSource(payload.source);
+        setSource(payload.source === "demo" ? "demo" : payload.source);
         void syncIdkFromServer();
         return;
       } catch {
@@ -153,45 +187,114 @@ export function FlashcardGame({
     }
 
     setBusy(true);
+    setLoadError(null);
     try {
-      const nextMode = rotateMode(mode);
+      const modeBase = loadOpts?.resetMode ? null : mode;
+      const nextMode = rotateMode(modeBase);
       const qs = new URLSearchParams({ mode: nextMode });
-      const res = await fetch(`/api/word?${qs.toString()}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to fetch word");
+      if (demo) {
+        qs.set("vocabTier", String(guestVocabTierRef.current));
+      }
+      const url = demo ? `${demo.fetchPath}?${qs.toString()}` : `/api/word?${qs.toString()}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Failed to fetch word");
+      }
       const payload = (await res.json()) as ApiPayload;
       setMode(nextMode);
       setWord(payload.word);
       setOptions(buildOptions(payload.word, payload.distractors));
-      setSource(payload.source);
+      setSource(payload.source === "demo" ? "demo" : payload.source);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Couldn’t load a word.");
+      setWord(null);
+      setOptions([]);
+      setMode(null);
     } finally {
       setBusy(false);
     }
     void syncIdkFromServer();
-  }, [mode, syncIdkFromServer]);
+  }, [demo, mode, syncIdkFromServer]);
 
   const startPrefetchAndScheduleAdvance = useCallback(() => {
     const nextMode = rotateMode(mode);
     const qs = new URLSearchParams({ mode: nextMode });
-    pendingNextRef.current = fetch(`/api/word?${qs.toString()}`, { cache: "no-store" }).then(
-      async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch word");
-        const payload = (await res.json()) as ApiPayload;
-        return { payload, nextMode };
-      },
-    );
+    if (demo) {
+      qs.set("vocabTier", String(guestVocabTierRef.current));
+    }
+    const url = demo ? `${demo.fetchPath}?${qs.toString()}` : `/api/word?${qs.toString()}`;
+    pendingNextRef.current = fetch(url, { cache: "no-store" }).then(async (res) => {
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Failed to fetch word");
+      }
+      const payload = (await res.json()) as ApiPayload;
+      return { payload, nextMode };
+    });
 
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     advanceTimerRef.current = setTimeout(() => {
       advanceTimerRef.current = null;
       void load();
     }, 1400);
-  }, [load, mode]);
+  }, [demo, load, mode]);
 
   useEffect(() => {
+    if (demo) {
+      try {
+        const tierRaw =
+          typeof window !== "undefined" ? window.localStorage.getItem(GUEST_DEMO_VOCAB_TIER_KEY) : null;
+        const tier = tierRaw ? parseInt(tierRaw, 10) : 0;
+        guestVocabTierRef.current = Number.isFinite(tier) && tier >= 0 ? tier : 0;
+      } catch {
+        guestVocabTierRef.current = 0;
+      }
+      try {
+        const raw = typeof window !== "undefined" ? window.localStorage.getItem(GUEST_DEMO_TRIALS_KEY) : null;
+        const t = raw ? parseInt(raw, 10) : 0;
+        trialsUsedRef.current = Number.isFinite(t) ? t : 0;
+        if (trialsUsedRef.current >= GUEST_DEMO_MAX_TRIALS) {
+          setTrialLimitReached(true);
+          return;
+        }
+      } catch {
+        trialsUsedRef.current = 0;
+      }
+    }
     if (restoreRound()) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleGuestRetryAnotherTen = useCallback(() => {
+    if (!demo) return;
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+    pendingNextRef.current = null;
+
+    const nextTier = guestVocabTierRef.current + 1;
+    guestVocabTierRef.current = nextTier;
+    trialsUsedRef.current = 0;
+    try {
+      window.localStorage.setItem(GUEST_DEMO_VOCAB_TIER_KEY, String(nextTier));
+      window.localStorage.setItem(GUEST_DEMO_TRIALS_KEY, "0");
+      window.localStorage.removeItem(GUEST_DEMO_ROUND_KEY);
+    } catch {
+      /* ignore */
+    }
+
+    setTrialLimitReached(false);
+    setReveal(null);
+    setMode(null);
+    setWord(null);
+    setOptions([]);
+    setLoadError(null);
+    correctStreakRef.current = 0;
+    void load({ resetMode: true });
+  }, [demo, load]);
 
   const prompt = useMemo(() => (word && mode ? getPrompt(mode, word) : null), [mode, word]);
 
@@ -200,7 +303,8 @@ export function FlashcardGame({
       if (!word || !mode || busy || reveal) return;
       if (opt.kind !== "word") return;
       const pickedKey = `word:${opt.word.id}`;
-      setAfterAnswerTipIndex(Math.floor(Math.random() * AFTER_ANSWER_TIPS.length));
+      const tipsLen = demo ? DEMO_AFTER_ANSWER_TIPS.length : AFTER_ANSWER_TIPS.length;
+      setAfterAnswerTipIndex(Math.floor(Math.random() * tipsLen));
       setReveal({ correctId: word.id, pickedKey });
 
       const isCorrect = opt.word.id === word.id;
@@ -216,8 +320,39 @@ export function FlashcardGame({
         delta = scoreDelta(word.level, result);
       }
 
+      if (demo) {
+        const next = scoreRef.current + delta;
+        scoreRef.current = next;
+        onScoreChange(next, delta);
+        try {
+          window.localStorage.setItem(GUEST_DEMO_SCORE_KEY, String(next));
+        } catch {
+          /* ignore */
+        }
+
+        const hitCap = trialsUsedRef.current + 1 >= GUEST_DEMO_MAX_TRIALS;
+        trialsUsedRef.current += 1;
+        try {
+          window.localStorage.setItem(GUEST_DEMO_TRIALS_KEY, String(trialsUsedRef.current));
+        } catch {
+          /* ignore */
+        }
+
+        if (hitCap) {
+          pendingNextRef.current = null;
+          if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+          advanceTimerRef.current = setTimeout(() => {
+            advanceTimerRef.current = null;
+            setTrialLimitReached(true);
+          }, 1400);
+          return;
+        }
+
+        startPrefetchAndScheduleAdvance();
+        return;
+      }
+
       if (result !== "correct") {
-        // Add to review list on wrong answer.
         try {
           await upsertFailedWord(word.id);
           onReviewChange?.();
@@ -225,7 +360,6 @@ export function FlashcardGame({
           // Ignore review failures (e.g. auth issues) without blocking gameplay.
         }
       } else if (source === "review") {
-        // Correctly answered a review word -> remove from review list.
         try {
           await removeFailedWord(word.id);
           onReviewChange?.();
@@ -235,12 +369,10 @@ export function FlashcardGame({
       }
 
       if (delta !== 0) {
-        // Persist points atomically in DB, then sync UI.
         try {
           const nextTotal = await incrementPoints(delta);
           onScoreChange(nextTotal, delta);
         } catch {
-          // Fallback to optimistic local update if schema/function isn't ready yet.
           const next = scoreRef.current + delta;
           scoreRef.current = next;
           onScoreChange(next, delta);
@@ -251,10 +383,11 @@ export function FlashcardGame({
 
       startPrefetchAndScheduleAdvance();
     },
-    [busy, mode, onReviewChange, onScoreChange, reveal, source, startPrefetchAndScheduleAdvance, word],
+    [busy, demo, mode, onReviewChange, onScoreChange, reveal, source, startPrefetchAndScheduleAdvance, word],
   );
 
   const pickDontKnow = useCallback(async () => {
+    if (demo) return;
     if (!word || !mode || busy || reveal) return;
     if (idkRemaining <= 0) return;
 
@@ -263,8 +396,8 @@ export function FlashcardGame({
     try {
       rem = await consumeIdkQuota(date);
     } catch {
-      if (!consumeIdkIfAllowedLocal(userId)) return;
-      rem = getIdkRemainingLocal(userId);
+      if (!consumeIdkIfAllowedLocal(userId!)) return;
+      rem = getIdkRemainingLocal(userId!);
     }
     if (rem < 0) return;
 
@@ -284,17 +417,7 @@ export function FlashcardGame({
     onScoreChange(scoreRef.current, 0);
 
     startPrefetchAndScheduleAdvance();
-  }, [
-    busy,
-    idkRemaining,
-    mode,
-    onReviewChange,
-    onScoreChange,
-    reveal,
-    startPrefetchAndScheduleAdvance,
-    userId,
-    word,
-  ]);
+  }, [busy, demo, idkRemaining, mode, onReviewChange, onScoreChange, reveal, startPrefetchAndScheduleAdvance, userId, word]);
 
   const correctAnswerText = useMemo(() => (word && mode ? getAnswerText(mode, word) : ""), [mode, word]);
 
@@ -305,14 +428,64 @@ export function FlashcardGame({
     [options],
   );
 
+  const tipsForFooter = demo ? DEMO_AFTER_ANSWER_TIPS : AFTER_ANSWER_TIPS;
+
   return (
-    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_60px_rgba(0,0,0,0.06)]">
+    <div className="relative rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_60px_rgba(0,0,0,0.06)]">
+      {trialLimitReached ? (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-3xl bg-white/95 p-6 text-center backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="guest-trial-title"
+        >
+          <div id="guest-trial-title" className="text-lg font-semibold text-zinc-900">
+            {`You've played ${GUEST_DEMO_MAX_TRIALS} rounds as guest`}
+          </div>
+          <p className="max-w-sm text-sm text-zinc-600">
+            Sign in to keep playing, save your score, and unlock the full word list and review tools.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleGuestRetryAnotherTen()}
+              className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50"
+            >
+              Retry
+            </button>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-xl bg-[#1a5156] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#164448]"
+            >
+              Log in to play more
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {loadError ? (
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">Demo words aren’t ready</p>
+          <p className="mt-1 text-amber-900/90">{loadError}</p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+            onClick={() => void load()}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-semibold tracking-wide text-zinc-600">
-            <span className="uppercase">{word ? `HSK ${word.level}` : "Loading"}</span>
+            <span className="uppercase">{word ? `HSK ${word.level}` : loadError ? "Setup needed" : "Loading"}</span>
             {word && source === "review" ? (
               <span className="font-medium text-zinc-400"> - Previous Mistake</span>
+            ) : null}
+            {word && source === "demo" ? (
+              <span className="font-medium text-zinc-400"> - Guest demo</span>
             ) : null}
           </div>
         </div>
@@ -381,7 +554,7 @@ export function FlashcardGame({
                     ease: [0.22, 1, 0.36, 1],
                     delay: i * 0.03,
                   }}
-                  disabled={busy || Boolean(reveal)}
+                  disabled={busy || Boolean(reveal) || trialLimitReached}
                   onClick={() => void pick(opt)}
                   className={`${base} border-zinc-200 bg-white text-zinc-900 hover:bg-white ${revealedStyle}`}
                 >
@@ -390,39 +563,41 @@ export function FlashcardGame({
               );
               })}
 
-            <motion.button
-              type="button"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.18,
-                ease: [0.22, 1, 0.36, 1],
-                delay: wordOptionsShown.length * 0.03,
-              }}
-              disabled={busy || Boolean(reveal) || idkExhausted}
-              onClick={() => void pickDontKnow()}
-              className={`w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed sm:col-span-2 ${
-                reveal?.pickedKey === "dontKnow"
-                  ? "z-[1] !bg-amber-200 !text-amber-950"
-                  : idkExhausted
-                    ? "border-zinc-200 bg-zinc-100 text-zinc-400"
-                    : "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
-              }`}
-            >
-              {idkExhausted ? (
-                "Wait until tomorrow"
-              ) : (
-                <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
-                  <span>I don’t know</span>
-                  <span className="font-medium text-zinc-500">({idkRemaining} Remaining)</span>
-                </span>
-              )}
-            </motion.button>
+            {!demo ? (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.18,
+                  ease: [0.22, 1, 0.36, 1],
+                  delay: wordOptionsShown.length * 0.03,
+                }}
+                disabled={busy || Boolean(reveal) || idkExhausted}
+                onClick={() => void pickDontKnow()}
+                className={`w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed sm:col-span-2 ${
+                  reveal?.pickedKey === "dontKnow"
+                    ? "z-[1] !bg-amber-200 !text-amber-950"
+                    : idkExhausted
+                      ? "border-zinc-200 bg-zinc-100 text-zinc-400"
+                      : "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
+                }`}
+              >
+                {idkExhausted ? (
+                  "Wait until tomorrow"
+                ) : (
+                  <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
+                    <span>I don’t know</span>
+                    <span className="font-medium text-zinc-500">({idkRemaining} Remaining)</span>
+                  </span>
+                )}
+              </motion.button>
+            ) : null}
           </div>
           </div>
 
           {reveal && (
-            <div className="text-sm text-zinc-500">{AFTER_ANSWER_TIPS[afterAnswerTipIndex]}</div>
+            <div className="text-sm text-zinc-500">{tipsForFooter[afterAnswerTipIndex % tipsForFooter.length]}</div>
           )}
         </motion.div>
       </AnimatePresence>

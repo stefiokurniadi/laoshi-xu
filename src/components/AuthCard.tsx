@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { BrandLogo } from "@/components/BrandLogo";
 import { resendSignupConfirmation, signInWithEmail, signUpWithEmail } from "@/app/actions/auth";
@@ -55,6 +56,7 @@ export function AuthCard({
   resendEmail?: string | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [localError, setLocalError] = useState<string | null>(null);
   const [showNotice, setShowNotice] = useState(Boolean(authNotice));
@@ -66,8 +68,8 @@ export function AuthCard({
   }, [authNotice]);
 
   const clearQuery = useCallback(() => {
-    router.replace("/");
-  }, [router]);
+    router.replace(pathname || "/");
+  }, [pathname, router]);
 
   // Consume query-string auth errors into local state, then clean the URL so refresh doesn't keep it.
   useEffect(() => {
@@ -98,10 +100,16 @@ export function AuthCard({
 
       <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white px-6 py-7 shadow-sm sm:max-w-md sm:px-8 sm:py-8">
         <div className="mb-6 flex flex-col items-center gap-4">
-          <BrandLogo
-            priority
-            className="h-32 w-32 rounded-full border border-zinc-200/80 shadow-md ring-2 ring-zinc-100 sm:h-36 sm:w-36"
-          />
+          <Link
+            href="/"
+            className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
+            aria-label="Back to home"
+          >
+            <BrandLogo
+              priority
+              className="h-32 w-32 rounded-full border border-zinc-200/80 shadow-md ring-2 ring-zinc-100 sm:h-36 sm:w-36"
+            />
+          </Link>
           <div className="flex w-full max-w-[18rem] flex-col items-center gap-2 text-center">
             <p className="text-[19px] font-bold tracking-[0.2em] text-zinc-900">LAOSHI XU</p>
             <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-base font-semibold tracking-tight text-zinc-900">

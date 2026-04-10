@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.verifyOtp({ type: type as never, token_hash });
     if (error) {
       return NextResponse.redirect(
-        new URL(`/?authError=${encodeURIComponent(error.message)}`, requestUrl.origin),
+        new URL(`/login?authError=${encodeURIComponent(error.message)}`, requestUrl.origin),
       );
     }
 

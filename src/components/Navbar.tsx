@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, KeyRound, LogOut, UserRound, X } from "lucide-react";
+import { ChevronDown, KeyRound, LogIn, LogOut, UserRound, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,10 +14,13 @@ export function Navbar({
   email,
   score,
   scoreDelta,
+  loginHref,
 }: {
   email?: string | null;
   score: number;
   scoreDelta: number | null;
+  /** When set and the user is not signed in, show a Log in control (e.g. on the public homepage). */
+  loginHref?: string;
 }) {
   const deltaColor = scoreDelta == null ? null : scoreDelta > 0 ? "bg-emerald-500" : scoreDelta < 0 ? "bg-rose-500" : "bg-zinc-500";
   const deltaText = useMemo(() => {
@@ -28,6 +31,7 @@ export function Navbar({
 
   const ratingLabel = useMemo(() => playerRatingLabel(score), [score]);
   const ratingShort = useMemo(() => ratingLabel.replace(/^Rating:\s*/i, ""), [ratingLabel]);
+  const pointLabel = email ? "Point:" : "Guest Point:";
 
   const [accountOpen, setAccountOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -158,7 +162,7 @@ export function Navbar({
           ) : null}
 
           <div className="inline-flex h-10 min-h-10 shrink-0 items-center gap-2 rounded-full border border-black/10 bg-[#1a5156] px-4 text-sm font-medium text-white shadow-sm">
-            <span className="text-white/75">Point</span>
+            <span className="text-white/100">{pointLabel}</span>
             <motion.span
               key={score}
               initial={{ scale: 1 }}
@@ -183,7 +187,7 @@ export function Navbar({
             </AnimatePresence>
           </div>
 
-          {email && (
+          {email ? (
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
@@ -245,7 +249,15 @@ export function Navbar({
                 )}
               </AnimatePresence>
             </div>
-          )}
+          ) : loginHref ? (
+            <Link
+              href={loginHref}
+              className="inline-flex h-10 min-h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] text-white shadow-sm hover:bg-[#164448] sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
+            >
+              <LogIn className="h-[1.125rem] w-[1.125rem] shrink-0 sm:hidden" strokeWidth={2} aria-hidden />
+              <span className="hidden sm:inline">Login for Free</span>
+            </Link>
+          ) : null}
         </div>
       </div>
 

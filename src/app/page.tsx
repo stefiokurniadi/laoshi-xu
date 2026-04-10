@@ -1,36 +1,19 @@
 import { ensureProfile } from "@/app/actions/profile";
 import { FlashcardShell } from "@/app/flashcards/FlashcardShell";
-import { AuthCard } from "@/components/AuthCard";
+import { PublicFlashcardShellClient } from "@/components/PublicFlashcardShellClient";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { redirect } from "next/navigation";
 
-type PageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function Home(props: PageProps) {
-  const searchParams = (await props.searchParams) ?? {};
-  const authError = typeof searchParams.authError === "string" ? searchParams.authError : null;
-  const authNotice = typeof searchParams.authNotice === "string" ? searchParams.authNotice : null;
-  const resendEmail = typeof searchParams.resendEmail === "string" ? searchParams.resendEmail : null;
-
+export default async function Home() {
   return (
     <main id="main-content" className="flex flex-1 flex-col">
-      <Main authError={authError} authNotice={authNotice} resendEmail={resendEmail} />
+      <Main />
     </main>
   );
 }
 
-async function Main({
-  authError,
-  authNotice,
-  resendEmail,
-}: {
-  authError: string | null;
-  authNotice: string | null;
-  resendEmail: string | null;
-}) {
+async function Main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -57,11 +40,7 @@ async function Main({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return (
-      <div className="flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center bg-gradient-to-b from-[#f0f6f7] via-[#e4eef0] to-[#d6e6e8] px-6 py-16 sm:py-20">
-        <AuthCard authError={authError} authNotice={authNotice} resendEmail={resendEmail} />
-      </div>
-    );
+    return <PublicFlashcardShellClient />;
   }
 
   if (isSuperadminEmail(user.email)) {

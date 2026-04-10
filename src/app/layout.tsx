@@ -95,11 +95,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body
-        className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50"
+        className="flex min-h-dvh flex-col bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50"
         suppressHydrationWarning
       >
         <JsonLd />
-        {children}
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <footer className="shrink-0 py-2 text-center text-[10px] text-zinc-500 dark:text-zinc-600">
+          (c) copyrights by stefiokurniadi
+        </footer>
         <Analytics />
         <SpeedInsights />
       </body>

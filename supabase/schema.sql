@@ -342,3 +342,22 @@ $$;
 revoke all on function public.get_leaderboard_snapshot() from public;
 grant execute on function public.get_leaderboard_snapshot() to authenticated;
 
+-- 8) Anonymous demo word pool (curated subset for guests; edit rows after seeding)
+create table if not exists public.anon_demo_words (
+  id bigint generated always as identity primary key,
+  hsk_word_id bigint not null references public.hsk_words(id) on delete cascade,
+  sort_order integer not null unique,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists anon_demo_words_hsk_word_id_idx on public.anon_demo_words(hsk_word_id);
+
+alter table public.anon_demo_words enable row level security;
+
+create policy "anon_demo_words_select_all"
+on public.anon_demo_words
+for select
+using (true);
+
+-- Populate with `supabase/anon_demo_words_seed.sql` after `hsk_words` exists.
+

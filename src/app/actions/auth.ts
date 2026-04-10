@@ -10,10 +10,10 @@ export async function signUpWithEmail(formData: FormData) {
   const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
   if (!email || !password) {
-    redirect("/?authError=Missing%20email%20or%20password");
+    redirect("/login?authError=Missing%20email%20or%20password");
   }
   if (passwordConfirm && password !== passwordConfirm) {
-    redirect("/?authError=Passwords%20do%20not%20match");
+    redirect("/login?authError=Passwords%20do%20not%20match");
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -27,7 +27,7 @@ export async function signUpWithEmail(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/?authError=${encodeURIComponent(error.message)}`);
+    redirect(`/login?authError=${encodeURIComponent(error.message)}`);
   }
 
   // Confirmations disabled: session is created immediately.
@@ -36,7 +36,7 @@ export async function signUpWithEmail(formData: FormData) {
   }
 
   redirect(
-    `/?authNotice=${encodeURIComponent("Check your email and open the confirmation link before signing in.")}`,
+    `/login?authNotice=${encodeURIComponent("Check your email and open the confirmation link before signing in.")}`,
   );
 }
 
@@ -46,7 +46,7 @@ export async function signInWithEmail(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    redirect("/?authError=Missing%20email%20or%20password");
+    redirect("/login?authError=Missing%20email%20or%20password");
   }
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -62,10 +62,10 @@ export async function signInWithEmail(formData: FormData) {
         authError: error.message,
         resendEmail: email,
       });
-      redirect(`/?${q.toString()}`);
+      redirect(`/login?${q.toString()}`);
     }
 
-    redirect(`/?authError=${encodeURIComponent(error.message)}`);
+    redirect(`/login?authError=${encodeURIComponent(error.message)}`);
   }
 
   redirect("/");
@@ -76,7 +76,7 @@ export async function resendSignupConfirmation(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
 
   if (!email) {
-    redirect("/?authError=" + encodeURIComponent("Enter your email to resend the confirmation link."));
+    redirect("/login?authError=" + encodeURIComponent("Enter your email to resend the confirmation link."));
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -89,11 +89,11 @@ export async function resendSignupConfirmation(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/?authError=${encodeURIComponent(error.message)}&resendEmail=${encodeURIComponent(email)}`);
+    redirect(`/login?authError=${encodeURIComponent(error.message)}&resendEmail=${encodeURIComponent(email)}`);
   }
 
   redirect(
-    `/?authNotice=${encodeURIComponent("Confirmation email sent. Check your inbox (and spam).")}&resendEmail=${encodeURIComponent(email)}`,
+    `/login?authNotice=${encodeURIComponent("Confirmation email sent. Check your inbox (and spam).")}&resendEmail=${encodeURIComponent(email)}`,
   );
 }
 
