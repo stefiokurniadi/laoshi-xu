@@ -4,7 +4,9 @@ export function isMissingDbObjectError(error: { code?: string; message?: string 
   const msg = error.message ?? "";
   if (code === "PGRST202" || code === "42883" || code === "42703") return true;
   if (
-    /touch_failed_word|Could not find the function|times_seen|does not exist|schema cache/i.test(msg)
+    /touch_failed_word|get_idk_remaining|consume_idk_quota|idk_daily_uses|Could not find the function|times_seen|does not exist|schema cache/i.test(
+      msg,
+    )
   ) {
     return true;
   }

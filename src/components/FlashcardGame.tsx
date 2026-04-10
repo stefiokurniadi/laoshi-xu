@@ -10,16 +10,25 @@ import {
   rotateMode,
   scoreDelta,
 } from "@/lib/game";
+import { fetchIdkRemaining, consumeIdkQuota } from "@/app/actions/idkQuota";
 import { incrementPoints } from "@/app/actions/profile";
 import { removeFailedWord, upsertFailedWord } from "@/app/actions/review";
+import {
+  consumeIdkIfAllowedLocal,
+  getIdkRemainingLocal,
+  IDK_DAILY_LIMIT,
+  localDateKey,
+} from "@/lib/idkQuota";
 
 type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "review" };
 
 export function FlashcardGame({
+  userId,
   initialScore,
   onScoreChange,
   onReviewChange,
 }: {
+  userId: string;
   initialScore: number;
   onScoreChange: (nextScore: number, delta: number) => void;
   /** Called after review list mutations so the sidebar can refetch without relying on Realtime alone. */
@@ -35,6 +44,23 @@ export function FlashcardGame({
   const scoreRef = useRef(initialScore);
   const correctStreakRef = useRef(0);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Next round fetched in the background while the answer is visible (1.4s). */
+  const pendingNextRef = useRef<Promise<{ payload: ApiPayload; nextMode: QuestionMode }> | null>(null);
+  const [idkRemaining, setIdkRemaining] = useState(IDK_DAILY_LIMIT);
+
+  const syncIdkFromServer = useCallback(async () => {
+    try {
+      const r = await fetchIdkRemaining(localDateKey());
+      setIdkRemaining(r);
+    } catch {
+      setIdkRemaining(getIdkRemainingLocal(userId));
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void syncIdkFromServer();
+  }, [syncIdkFromServer]);
+
   useEffect(() => {
     scoreRef.current = initialScore;
   }, [initialScore]);
@@ -46,8 +72,26 @@ export function FlashcardGame({
   }, []);
 
   const load = useCallback(async () => {
-    setBusy(true);
     setReveal(null);
+
+    const pending = pendingNextRef.current;
+    pendingNextRef.current = null;
+
+    if (pending) {
+      try {
+        const { payload, nextMode } = await pending;
+        setMode(nextMode);
+        setWord(payload.word);
+        setOptions(buildOptions(payload.word, payload.distractors));
+        setSource(payload.source);
+        void syncIdkFromServer();
+        return;
+      } catch {
+        /* prefetch failed — fetch below */
+      }
+    }
+
+    setBusy(true);
     try {
       const nextMode = rotateMode(mode);
       const qs = new URLSearchParams({ mode: nextMode });
@@ -61,7 +105,26 @@ export function FlashcardGame({
     } finally {
       setBusy(false);
     }
-  }, [mode]);
+    void syncIdkFromServer();
+  }, [mode, syncIdkFromServer]);
+
+  const startPrefetchAndScheduleAdvance = useCallback(() => {
+    const nextMode = rotateMode(mode);
+    const qs = new URLSearchParams({ mode: nextMode });
+    pendingNextRef.current = fetch(`/api/word?${qs.toString()}`, { cache: "no-store" }).then(
+      async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch word");
+        const payload = (await res.json()) as ApiPayload;
+        return { payload, nextMode };
+      },
+    );
+
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    advanceTimerRef.current = setTimeout(() => {
+      advanceTimerRef.current = null;
+      void load();
+    }, 1400);
+  }, [load, mode]);
 
   useEffect(() => {
     void load();
@@ -73,12 +136,12 @@ export function FlashcardGame({
   const pick = useCallback(
     async (opt: Option) => {
       if (!word || !mode || busy || reveal) return;
-      const pickedKey = opt.kind === "dontKnow" ? "dontKnow" : `word:${opt.word.id}`;
+      if (opt.kind !== "word") return;
+      const pickedKey = `word:${opt.word.id}`;
       setReveal({ correctId: word.id, pickedKey });
 
-      const isDontKnow = opt.kind === "dontKnow";
-      const isCorrect = opt.kind === "word" && opt.word.id === word.id;
-      const result = isDontKnow ? "dontKnow" : isCorrect ? "correct" : "wrong";
+      const isCorrect = opt.word.id === word.id;
+      const result = isCorrect ? "correct" : "wrong";
 
       let delta: number;
       if (result === "correct") {
@@ -91,7 +154,7 @@ export function FlashcardGame({
       }
 
       if (result !== "correct") {
-        // Add to review list (wrong or I don't know).
+        // Add to review list on wrong answer.
         try {
           await upsertFailedWord(word.id);
           onReviewChange?.();
@@ -123,16 +186,60 @@ export function FlashcardGame({
         onScoreChange(scoreRef.current, 0);
       }
 
-      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      advanceTimerRef.current = setTimeout(() => {
-        advanceTimerRef.current = null;
-        void load();
-      }, 2000);
+      startPrefetchAndScheduleAdvance();
     },
-    [busy, load, mode, onReviewChange, onScoreChange, reveal, source, word],
+    [busy, mode, onReviewChange, onScoreChange, reveal, source, startPrefetchAndScheduleAdvance, word],
   );
 
+  const pickDontKnow = useCallback(async () => {
+    if (!word || !mode || busy || reveal) return;
+    if (idkRemaining <= 0) return;
+
+    const date = localDateKey();
+    let rem: number;
+    try {
+      rem = await consumeIdkQuota(date);
+    } catch {
+      if (!consumeIdkIfAllowedLocal(userId)) return;
+      rem = getIdkRemainingLocal(userId);
+    }
+    if (rem < 0) return;
+
+    setIdkRemaining(rem);
+
+    setReveal({ correctId: word.id, pickedKey: "dontKnow" });
+    correctStreakRef.current = 0;
+
+    try {
+      await upsertFailedWord(word.id);
+      onReviewChange?.();
+    } catch {
+      /* ignore */
+    }
+
+    onScoreChange(scoreRef.current, 0);
+
+    startPrefetchAndScheduleAdvance();
+  }, [
+    busy,
+    idkRemaining,
+    mode,
+    onReviewChange,
+    onScoreChange,
+    reveal,
+    startPrefetchAndScheduleAdvance,
+    userId,
+    word,
+  ]);
+
   const correctAnswerText = useMemo(() => (word && mode ? getAnswerText(mode, word) : ""), [mode, word]);
+
+  const idkExhausted = idkRemaining <= 0;
+
+  const wordOptionsShown = useMemo(
+    () => options.filter((opt): opt is { kind: "word"; word: HskWord } => opt.kind === "word"),
+    [options],
+  );
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_60px_rgba(0,0,0,0.06)]">
@@ -150,10 +257,10 @@ export function FlashcardGame({
       <AnimatePresence mode="wait">
         <motion.div
           key={word?.id ?? "loading"}
-          initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
-          transition={{ duration: 0.22 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           className="space-y-4"
         >
           <div className="rounded-3xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-6">
@@ -179,28 +286,16 @@ export function FlashcardGame({
           </div>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {options.map((opt) => {
-              const label =
-                opt.kind === "dontKnow"
-                  ? "I don’t know"
-                  : word && mode
-                    ? getAnswerText(mode, opt.word)
-                    : opt.kind === "word"
-                      ? opt.word.english
-                      : "I don’t know";
+            {wordOptionsShown.map((opt, i) => {
+              const label = word && mode ? getAnswerText(mode, opt.word) : opt.word.english;
 
-              const optKey = opt.kind === "dontKnow" ? "dontKnow" : `word:${opt.word.id}`;
+              const optKey = `word:${opt.word.id}`;
               const isPicked = reveal?.pickedKey === optKey;
-              const isCorrectWord = opt.kind === "word" && word && opt.word.id === word.id;
+              const isCorrectWord = Boolean(word && opt.word.id === word.id);
               const showState = Boolean(reveal);
 
               const base =
                 "w-full rounded-2xl border px-4 py-4 text-left text-base font-semibold transition-colors shadow-sm disabled:cursor-default disabled:opacity-100";
-
-              const dontKnowStyle =
-                opt.kind === "dontKnow"
-                  ? "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
-                  : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50";
 
               const revealedStyle = !showState
                 ? ""
@@ -211,26 +306,61 @@ export function FlashcardGame({
                     : "opacity-45";
 
               return (
-                <button
+                <motion.button
                   key={optKey}
+                  type="button"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.18,
+                    ease: [0.22, 1, 0.36, 1],
+                    delay: i * 0.03,
+                  }}
                   disabled={busy || Boolean(reveal)}
                   onClick={() => void pick(opt)}
-                  className={`${base} ${dontKnowStyle} ${revealedStyle} ${
-                    opt.kind === "dontKnow" ? "sm:col-span-2 text-center" : ""
-                  }`}
+                  className={`${base} border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 ${revealedStyle}`}
                 >
-                  <div className={opt.kind === "dontKnow" ? "w-full text-center leading-snug" : "leading-snug"}>
-                    {label}
-                  </div>
-                </button>
+                  <div className="leading-snug">{label}</div>
+                </motion.button>
               );
-            })}
+              })}
+
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.18,
+                ease: [0.22, 1, 0.36, 1],
+                delay: wordOptionsShown.length * 0.03,
+              }}
+              disabled={busy || Boolean(reveal) || idkExhausted}
+              onClick={() => void pickDontKnow()}
+              className={`w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed sm:col-span-2 ${
+                reveal?.pickedKey === "dontKnow"
+                  ? "z-[1] border-amber-600 bg-amber-200 text-amber-950 ring-2 ring-amber-500/40"
+                  : idkExhausted
+                    ? "border-zinc-200 bg-zinc-100 text-zinc-400"
+                    : "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
+              }`}
+            >
+              {idkExhausted ? (
+                "Wait until tomorrow"
+              ) : (
+                <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
+                  <span>I don’t know</span>
+                  <span className="font-medium text-zinc-500">({idkRemaining} Remaining)</span>
+                </span>
+              )}
+            </motion.button>
           </div>
 
           {reveal && (
             <div className="text-sm text-zinc-500">
               Tip: Score includes your word level plus a streak bonus (+1 on your 2nd correct in a row, +2 on
-              the 3rd, …). Wrong or “I don’t know” resets the streak; “I don’t know” does not subtract points.
+              the 3rd, …). Wrong answers reset the streak. “I don’t know” adds the word to review without losing
+              points (3 uses per day on your account, by your device’s local calendar date; resets after
+              midnight).
             </div>
           )}
         </motion.div>

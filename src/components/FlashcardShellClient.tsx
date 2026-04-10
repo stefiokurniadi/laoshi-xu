@@ -35,6 +35,7 @@ export function FlashcardShellClient({
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="flex flex-col gap-6">
           <FlashcardGame
+            userId={userId}
             initialScore={score}
             onScoreChange={(nextScore, d) => {
               setScore(nextScore);

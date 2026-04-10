@@ -58,11 +58,14 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/** Total multiple-choice answers (one correct + distractors). */
+export const ANSWER_CHOICE_COUNT = 4;
+
 export function buildOptions(correct: HskWord, distractors: HskWord[]): Option[] {
-  const words = shuffle([correct, ...distractors]).slice(0, 8);
-  const opts: Option[] = words.map((word) => ({ kind: "word", word }));
-  opts.push({ kind: "dontKnow" });
-  return opts;
+  const maxDistractors = ANSWER_CHOICE_COUNT - 1;
+  const d = distractors.slice(0, maxDistractors);
+  const words = shuffle([correct, ...d]).slice(0, ANSWER_CHOICE_COUNT);
+  return words.map((word) => ({ kind: "word", word }));
 }
 
 function clamp(n: number, min: number, max: number) {

@@ -100,7 +100,9 @@ export function ReviewList({
       <div className="mb-3 flex items-center justify-between">
         <div>
           <div className="text-sm font-semibold text-zinc-900">Review List</div>
-          <div className="text-xs text-zinc-500">Words you missed or marked “I don’t know”.</div>
+          <div className="text-xs text-zinc-500">
+            Words you missed or skipped with “I don’t know” (within your daily quota).
+          </div>
         </div>
       </div>
 

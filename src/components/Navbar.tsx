@@ -28,13 +28,25 @@ export function Navbar({
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
         <Link
           href="/"
-          className="flex min-w-0 shrink items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
+          className="flex min-w-0 shrink items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
         >
-          <BrandLogo className="h-10 w-10 rounded-full object-cover ring-1 ring-zinc-200/80 sm:h-11 sm:w-11" />
+          <BrandLogo className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 sm:h-11 sm:w-11" />
+          <span className="truncate text-base font-semibold tracking-tight text-zinc-900">
+            Laoshi Xu
+          </span>
         </Link>
 
-        <div className="flex items-center gap-2">
-          <div className="inline-flex h-10 items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 shadow-sm">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+          {email ? (
+            <span
+              className="min-w-0 max-w-[min(42vw,9rem)] shrink truncate text-xs text-zinc-600 sm:max-w-[14rem] sm:text-sm md:max-w-[18rem]"
+              title={email}
+            >
+              {email}
+            </span>
+          ) : null}
+
+          <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 shadow-sm">
             <span className="text-zinc-500">Score</span>
             <motion.span
               key={score}

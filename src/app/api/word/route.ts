@@ -33,7 +33,10 @@ export async function GET(request: Request) {
 
   const overlapHanzi =
     nextMode === "HZ_TO_EN" || nextMode === "PY_TO_MIX" ? word.hanzi : undefined;
-  const distractors = await getDistractors(word.level, word.id, 7, { overlapHanzi });
+  const distractors = await getDistractors(word.level, word.id, 3, {
+    overlapHanzi,
+    shapeTarget: { hanzi: word.hanzi, pinyin: word.pinyin },
+  });
 
   return NextResponse.json({ word, distractors, source: reviewWord ? "review" : "hsk" });
 }

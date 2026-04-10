@@ -2,6 +2,7 @@ import type { HskWord } from "@/lib/types";
 import { applyUsableEnglishGlossFilter, isUsableEnglishGloss } from "@/lib/englishGloss";
 import { shuffle } from "@/lib/game";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { matchesWordShape } from "@/lib/wordShape";
 
 function uniqueHanziChars(hanzi: string): string[] {
   const t = hanzi.trim();
@@ -61,12 +62,12 @@ export async function getRandomWord(maxLevel = 9): Promise<HskWord> {
 export async function getDistractors(
   level: number,
   excludeId: number,
-  n = 7,
-  options?: { overlapHanzi?: string },
+  n: number,
+  options: { shapeTarget: Pick<HskWord, "hanzi" | "pinyin">; overlapHanzi?: string },
 ): Promise<HskWord[]> {
   const supabase = await createSupabaseServerClient();
 
-  const fetchLimit = options?.overlapHanzi ? 500 : 60;
+  const fetchLimit = options.overlapHanzi ? 1200 : 900;
 
   let q = supabase
     .from("hsk_words")
@@ -77,13 +78,16 @@ export async function getDistractors(
   const { data, error } = await q.limit(fetchLimit);
   if (error) throw error;
 
-  const words = (data ?? []).filter((w) => isUsableEnglishGloss(w.english)) as HskWord[];
-  if (words.length === 0) return [];
+  const raw = (data ?? []).filter((w) => isUsableEnglishGloss(w.english)) as HskWord[];
+  if (raw.length === 0) return [];
 
-  const chars = options?.overlapHanzi ? uniqueHanziChars(options.overlapHanzi) : [];
+  const pool = raw.filter((w) => matchesWordShape(w, options.shapeTarget));
+  if (pool.length === 0) return [];
+
+  const chars = options.overlapHanzi ? uniqueHanziChars(options.overlapHanzi) : [];
 
   if (chars.length > 0) {
-    const overlap = words.filter((w) => sharesHanziWith(w.hanzi, chars));
+    const overlap = pool.filter((w) => sharesHanziWith(w.hanzi, chars));
     const picked: HskWord[] = [];
     const pickedIds = new Set<number>();
     for (const w of shuffle(overlap)) {
@@ -92,7 +96,7 @@ export async function getDistractors(
       pickedIds.add(w.id);
     }
     if (picked.length < n) {
-      const rest = shuffle(words.filter((w) => !pickedIds.has(w.id)));
+      const rest = shuffle(pool.filter((w) => !pickedIds.has(w.id)));
       for (const w of rest) {
         if (picked.length >= n) break;
         picked.push(w);
@@ -101,13 +105,13 @@ export async function getDistractors(
     return picked;
   }
 
-  if (words.length < n) return words;
+  if (pool.length < n) return shuffle(pool);
 
   const picked: HskWord[] = [];
-  const pool = [...words];
-  while (picked.length < n && pool.length) {
-    const idx = Math.floor(Math.random() * pool.length);
-    picked.push(pool.splice(idx, 1)[0]!);
+  const copy = [...pool];
+  while (picked.length < n && copy.length) {
+    const idx = Math.floor(Math.random() * copy.length);
+    picked.push(copy.splice(idx, 1)[0]!);
   }
   return picked;
 }

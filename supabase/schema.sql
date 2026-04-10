@@ -106,6 +106,104 @@ $$;
 revoke all on function public.touch_failed_word(bigint) from public;
 grant execute on function public.touch_failed_word(bigint) to authenticated;
 
+-- 3b) Daily "I don't know" quota (3 uses per calendar day; use_date = client local YYYY-MM-DD)
+create table if not exists public.idk_daily_uses (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  use_date date not null,
+  uses smallint not null default 0 check (uses >= 0 and uses <= 3),
+  primary key (user_id, use_date)
+);
+
+alter table public.idk_daily_uses enable row level security;
+
+create policy "idk_daily_uses_select_own"
+on public.idk_daily_uses
+for select
+using (auth.uid() = user_id);
+
+create policy "idk_daily_uses_insert_own"
+on public.idk_daily_uses
+for insert
+with check (auth.uid() = user_id);
+
+create policy "idk_daily_uses_update_own"
+on public.idk_daily_uses
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create or replace function public.get_idk_remaining(p_use_date date)
+returns integer
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select greatest(
+    0,
+    3 - coalesce(
+      (select uses from public.idk_daily_uses where user_id = auth.uid() and use_date = p_use_date),
+      0
+    )
+  );
+$$;
+
+revoke all on function public.get_idk_remaining(date) from public;
+grant execute on function public.get_idk_remaining(date) to authenticated;
+
+-- Returns remaining uses after a successful consume, or -1 if already at daily cap.
+create or replace function public.consume_idk_quota(p_use_date date)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cur int;
+  new_rem int;
+  i int := 0;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+
+  loop
+    i := i + 1;
+    if i > 8 then
+      raise exception 'idk quota concurrent retry limit';
+    end if;
+
+    select uses into cur
+    from public.idk_daily_uses
+    where user_id = auth.uid() and use_date = p_use_date
+    for update;
+
+    if found then
+      if cur >= 3 then
+        return -1;
+      end if;
+      update public.idk_daily_uses
+      set uses = uses + 1
+      where user_id = auth.uid() and use_date = p_use_date
+      returning 3 - uses into new_rem;
+      return new_rem;
+    end if;
+
+    begin
+      insert into public.idk_daily_uses (user_id, use_date, uses)
+      values (auth.uid(), p_use_date, 1);
+      return 2;
+    exception
+      when unique_violation then
+        null;
+    end;
+  end loop;
+end;
+$$;
+
+revoke all on function public.consume_idk_quota(date) from public;
+grant execute on function public.consume_idk_quota(date) to authenticated;
+
 -- 4) Atomic point increments (avoid races)
 create or replace function public.increment_total_points(delta integer)
 returns integer
