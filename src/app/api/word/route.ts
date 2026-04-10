@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getDistractors, getRandomWord, getRandomReviewWord } from "@/lib/hsk.server";
 import { parseQuestionMode } from "@/lib/game";
+import { getDistractors, getRandomWord, getRandomReviewWord } from "@/lib/hsk.server";
+import { isSuperadminEmail } from "@/lib/superadmin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -11,6 +12,10 @@ export async function GET(request: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && isSuperadminEmail(user.email)) {
+    return NextResponse.json({ error: "Superadmin cannot use the game API." }, { status: 403 });
+  }
 
   let maxLevel = 2;
   if (user) {

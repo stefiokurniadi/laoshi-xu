@@ -1,5 +1,6 @@
 "use server";
 
+import { assertNotSuperadminPlay } from "@/lib/assertNotSuperadminPlay";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function ensureProfile() {
@@ -37,6 +38,7 @@ export async function ensureProfile() {
 }
 
 export async function incrementPoints(delta: number) {
+  await assertNotSuperadminPlay();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("increment_total_points", { delta });
   if (error) throw error;

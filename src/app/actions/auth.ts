@@ -17,7 +17,7 @@ export async function signUpWithEmail(formData: FormData) {
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -30,8 +30,14 @@ export async function signUpWithEmail(formData: FormData) {
     redirect(`/?authError=${encodeURIComponent(error.message)}`);
   }
 
-  // If email confirmations are disabled, this will also create a session immediately.
-  redirect("/");
+  // Confirmations disabled: session is created immediately.
+  if (data.session) {
+    redirect("/");
+  }
+
+  redirect(
+    `/?authNotice=${encodeURIComponent("Check your email and open the confirmation link before signing in.")}`,
+  );
 }
 
 export async function signInWithEmail(formData: FormData) {
@@ -45,10 +51,50 @@ export async function signInWithEmail(formData: FormData) {
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
+    const msg = (error.message ?? "").toLowerCase();
+    const unconfirmed =
+      msg.includes("email not confirmed") ||
+      msg.includes("not confirmed") ||
+      (error as { code?: string }).code === "email_not_confirmed";
+
+    if (unconfirmed) {
+      const q = new URLSearchParams({
+        authError: error.message,
+        resendEmail: email,
+      });
+      redirect(`/?${q.toString()}`);
+    }
+
     redirect(`/?authError=${encodeURIComponent(error.message)}`);
   }
 
   redirect("/");
+}
+
+export async function resendSignupConfirmation(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const email = String(formData.get("email") ?? "").trim();
+
+  if (!email) {
+    redirect("/?authError=" + encodeURIComponent("Enter your email to resend the confirmation link."));
+  }
+
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${origin}/auth/confirm`,
+    },
+  });
+
+  if (error) {
+    redirect(`/?authError=${encodeURIComponent(error.message)}&resendEmail=${encodeURIComponent(email)}`);
+  }
+
+  redirect(
+    `/?authNotice=${encodeURIComponent("Confirmation email sent. Check your inbox (and spam).")}&resendEmail=${encodeURIComponent(email)}`,
+  );
 }
 
 export async function signInWithGoogle() {

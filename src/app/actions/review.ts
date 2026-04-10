@@ -1,9 +1,12 @@
 "use server";
 
+import { assertNotSuperadminPlay } from "@/lib/assertNotSuperadminPlay";
 import { isMissingDbObjectError } from "@/lib/supabaseMissingSchema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSuperadminEmail } from "@/lib/superadmin";
 
 export async function upsertFailedWord(wordId: number) {
+  await assertNotSuperadminPlay();
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -36,6 +39,7 @@ export async function getFailedWords() {
   } = await supabase.auth.getUser();
   if (userError) throw userError;
   if (!user) return [];
+  if (isSuperadminEmail(user.email)) return [];
 
   let data: unknown[] | null = null;
   {
@@ -78,6 +82,7 @@ export async function getFailedWords() {
 }
 
 export async function removeFailedWord(wordId: number) {
+  await assertNotSuperadminPlay();
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

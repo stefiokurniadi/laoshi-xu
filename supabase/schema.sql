@@ -231,6 +231,7 @@ revoke all on function public.increment_total_points(integer) from public;
 grant execute on function public.increment_total_points(integer) to authenticated;
 
 -- Leaderboard: top 20 by points; emails masked in RPC (first 3 chars + ***), except the caller’s own row.
+-- Excludes superadmin@laoshixu.com (must match SUPERADMIN_EMAIL / src/lib/superadmin.ts).
 create or replace function public.get_leaderboard_snapshot()
 returns jsonb
 language plpgsql
@@ -239,6 +240,7 @@ set search_path = public
 as $$
 declare
   viewer uuid := auth.uid();
+  viewer_email text;
   top_rows jsonb;
   viewer_in_top boolean;
   v_rank bigint;
@@ -248,6 +250,11 @@ declare
 begin
   if viewer is null then
     raise exception 'not authenticated';
+  end if;
+
+  select lower(trim(coalesce(email, ''))) into viewer_email from public.profiles where id = viewer;
+  if viewer_email = 'superadmin@laoshixu.com' then
+    raise exception 'Leaderboard is not available for this account.';
   end if;
 
   select a, b
@@ -260,6 +267,7 @@ begin
         p.total_points,
         row_number() over (order by p.total_points desc, p.id asc) as rnk
       from public.profiles p
+      where coalesce(lower(trim(p.email)), '') <> 'superadmin@laoshixu.com'
     ),
     top20 as (
       select * from ranked where rnk <= 20
@@ -301,6 +309,7 @@ begin
       p.total_points,
       row_number() over (order by p.total_points desc, p.id asc) as rnk
     from public.profiles p
+    where coalesce(lower(trim(p.email)), '') <> 'superadmin@laoshixu.com'
   ) r
   where r.id = viewer;
 

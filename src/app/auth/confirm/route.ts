@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { isSuperadminEmail } from "@/lib/superadmin";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -32,6 +33,13 @@ export async function GET(request: Request) {
         new URL(`/?authError=${encodeURIComponent(error.message)}`, requestUrl.origin),
       );
     }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const dest =
+      user && isSuperadminEmail(user.email) ? "/admin" : next;
+    return NextResponse.redirect(new URL(dest, requestUrl.origin));
   }
 
   return NextResponse.redirect(new URL(next, requestUrl.origin));

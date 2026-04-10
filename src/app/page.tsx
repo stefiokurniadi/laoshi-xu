@@ -1,7 +1,9 @@
 import { ensureProfile } from "@/app/actions/profile";
 import { FlashcardShell } from "@/app/flashcards/FlashcardShell";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AuthCard } from "@/components/AuthCard";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSuperadminEmail } from "@/lib/superadmin";
+import { redirect } from "next/navigation";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -10,15 +12,25 @@ type PageProps = {
 export default async function Home(props: PageProps) {
   const searchParams = (await props.searchParams) ?? {};
   const authError = typeof searchParams.authError === "string" ? searchParams.authError : null;
+  const authNotice = typeof searchParams.authNotice === "string" ? searchParams.authNotice : null;
+  const resendEmail = typeof searchParams.resendEmail === "string" ? searchParams.resendEmail : null;
 
   return (
     <div className="flex flex-1 flex-col">
-      <Main authError={authError} />
+      <Main authError={authError} authNotice={authNotice} resendEmail={resendEmail} />
     </div>
   );
 }
 
-async function Main({ authError }: { authError: string | null }) {
+async function Main({
+  authError,
+  authNotice,
+  resendEmail,
+}: {
+  authError: string | null;
+  authNotice: string | null;
+  resendEmail: string | null;
+}) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -47,9 +59,13 @@ async function Main({ authError }: { authError: string | null }) {
   if (!user) {
     return (
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6 py-20">
-        <AuthCard authError={authError} />
+        <AuthCard authError={authError} authNotice={authNotice} resendEmail={resendEmail} />
       </div>
     );
+  }
+
+  if (isSuperadminEmail(user.email)) {
+    redirect("/admin");
   }
 
   const profile = await ensureProfile();

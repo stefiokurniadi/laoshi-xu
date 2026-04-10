@@ -1,5 +1,6 @@
 "use server";
 
+import { assertNotSuperadminPlay } from "@/lib/assertNotSuperadminPlay";
 import { isMissingDbObjectError } from "@/lib/supabaseMissingSchema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -11,6 +12,7 @@ function assertClientDate(d: string): string {
 }
 
 export async function fetchIdkRemaining(clientLocalDate: string): Promise<number> {
+  await assertNotSuperadminPlay();
   const p_use_date = assertClientDate(clientLocalDate);
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("get_idk_remaining", { p_use_date });
@@ -24,6 +26,7 @@ export async function fetchIdkRemaining(clientLocalDate: string): Promise<number
 
 /** Remaining after consume, or -1 if daily cap already reached. */
 export async function consumeIdkQuota(clientLocalDate: string): Promise<number> {
+  await assertNotSuperadminPlay();
   const p_use_date = assertClientDate(clientLocalDate);
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("consume_idk_quota", { p_use_date });
