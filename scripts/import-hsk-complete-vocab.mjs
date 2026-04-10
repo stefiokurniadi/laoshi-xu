@@ -2,7 +2,8 @@
  * Import HSK vocabulary from drkameleon/complete-hsk-vocabulary (JSON) into Supabase `hsk_words`.
  *
  * Source: https://github.com/drkameleon/complete-hsk-vocabulary
- * Uses `complete.json`: simplified, pinyin from first form, English = first string in `forms[0].meanings`.
+ * Uses `complete.json`: simplified, pinyin from first form; English = first usable gloss in
+ * `forms[0].meanings` (skips lines containing "Surname" or "Variant of", case-insensitive).
  *
  * Level tags: `newest-N` (preferred), then `new-N`, then `old-N`. Values 1–6 map directly;
  * `new-7` / `newest-7` (HSK 3.0 bands 7–9) map to HSK_79_LEVEL (default 8).
@@ -39,6 +40,25 @@ function normalizeText(s) {
   return String(s ?? "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Matches `src/lib/englishGloss.ts` — meta dictionary glosses, not good as quiz targets. */
+function isMetaEnglishGloss(text) {
+  const t = String(text).toLowerCase();
+  return t.includes("surname") || t.includes("variant of");
+}
+
+/**
+ * @param {unknown} meanings
+ * @returns {string}
+ */
+function pickPreferredEnglish(meanings) {
+  if (!Array.isArray(meanings) || meanings.length === 0) return "";
+  const normalized = meanings.map((m) => normalizeText(m)).filter(Boolean);
+  for (const t of normalized) {
+    if (!isMetaEnglishGloss(t)) return t;
+  }
+  return normalized[0] || "";
 }
 
 /**
@@ -94,8 +114,7 @@ function rowFromEntry(entry, band79) {
   const hanzi = normalizeHanzi(entry?.simplified);
   const form = entry?.forms?.[0];
   const pinyin = normalizeText(form?.transcriptions?.pinyin);
-  const meanings = form?.meanings;
-  const english = meanings?.length ? normalizeText(meanings[0]) : "";
+  const english = pickPreferredEnglish(form?.meanings);
 
   if (!hanzi || !pinyin || !english) {
     return null;

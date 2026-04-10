@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { getDistractors, getRandomWord, getRandomReviewWord } from "@/lib/hsk.server";
+import { parseQuestionMode } from "@/lib/game";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const nextMode = parseQuestionMode(searchParams.get("mode"));
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -26,7 +30,11 @@ export async function GET() {
   const shouldMixReview = Math.random() < 0.25;
   const reviewWord = shouldMixReview ? await getRandomReviewWord() : null;
   const word = reviewWord ?? (await getRandomWord(maxLevel));
-  const distractors = await getDistractors(word.level, word.id, 7);
+
+  const overlapHanzi =
+    nextMode === "HZ_TO_EN" || nextMode === "PY_TO_MIX" ? word.hanzi : undefined;
+  const distractors = await getDistractors(word.level, word.id, 7, { overlapHanzi });
+
   return NextResponse.json({ word, distractors, source: reviewWord ? "review" : "hsk" });
 }
 

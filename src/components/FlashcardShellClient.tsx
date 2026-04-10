@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { HskWord } from "@/lib/types";
+import type { ReviewListRow } from "@/lib/types";
 import { Navbar } from "@/components/Navbar";
 import { FlashcardGame } from "@/components/FlashcardGame";
 import { ReviewList } from "@/components/ReviewList";
-
-type ReviewRow = { last_seen: string; word: HskWord };
 
 export function FlashcardShellClient({
   email,
@@ -16,12 +14,12 @@ export function FlashcardShellClient({
 }: {
   email?: string | null;
   initialScore: number;
-  initialReviewRows: ReviewRow[];
+  initialReviewRows: ReviewListRow[];
   userId: string;
 }) {
   const [score, setScore] = useState(initialScore);
   const [delta, setDelta] = useState<number | null>(null);
-  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
+  const [reviewEpoch, setReviewEpoch] = useState(0);
 
   return (
     <div className="relative flex min-h-[100svh] flex-col overflow-hidden bg-gradient-to-b from-white via-white to-zinc-50">
@@ -43,12 +41,12 @@ export function FlashcardShellClient({
               setDelta(d);
               window.setTimeout(() => setDelta(null), 900);
             }}
-            onReviewChange={() => setReviewRefreshKey((k) => k + 1)}
+            onReviewChange={() => setReviewEpoch((n) => n + 1)}
           />
           </div>
 
           <div className="flex flex-col gap-6">
-            <ReviewList initialRows={initialReviewRows} userId={userId} refreshKey={reviewRefreshKey} />
+            <ReviewList initialRows={initialReviewRows} userId={userId} refreshEpoch={reviewEpoch} />
           </div>
         </div>
       </div>

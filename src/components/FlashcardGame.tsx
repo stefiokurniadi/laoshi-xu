@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { HskWord, Option, QuestionMode } from "@/lib/types";
-import { buildOptions, getAnswerText, getPrompt, rotateMode, scoreDelta } from "@/lib/game";
+import {
+  buildOptions,
+  getAnswerText,
+  getPrompt,
+  rotateMode,
+  scoreDelta,
+} from "@/lib/game";
 import { incrementPoints } from "@/app/actions/profile";
 import { removeFailedWord, upsertFailedWord } from "@/app/actions/review";
 
@@ -16,6 +22,7 @@ export function FlashcardGame({
 }: {
   initialScore: number;
   onScoreChange: (nextScore: number, delta: number) => void;
+  /** Called after review list mutations so the sidebar can refetch without relying on Realtime alone. */
   onReviewChange?: () => void;
 }) {
   const [mode, setMode] = useState<QuestionMode | null>(null);
@@ -26,6 +33,7 @@ export function FlashcardGame({
   const [source, setSource] = useState<"hsk" | "review">("hsk");
 
   const scoreRef = useRef(initialScore);
+  const correctStreakRef = useRef(0);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     scoreRef.current = initialScore;
@@ -41,10 +49,11 @@ export function FlashcardGame({
     setBusy(true);
     setReveal(null);
     try {
-      const res = await fetch("/api/word", { cache: "no-store" });
+      const nextMode = rotateMode(mode);
+      const qs = new URLSearchParams({ mode: nextMode });
+      const res = await fetch(`/api/word?${qs.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch word");
       const payload = (await res.json()) as ApiPayload;
-      const nextMode = rotateMode(mode);
       setMode(nextMode);
       setWord(payload.word);
       setOptions(buildOptions(payload.word, payload.distractors));
@@ -71,7 +80,15 @@ export function FlashcardGame({
       const isCorrect = opt.kind === "word" && opt.word.id === word.id;
       const result = isDontKnow ? "dontKnow" : isCorrect ? "correct" : "wrong";
 
-      const delta = scoreDelta(word.level, result);
+      let delta: number;
+      if (result === "correct") {
+        const newStreak = correctStreakRef.current + 1;
+        delta = scoreDelta(word.level, "correct", { newCorrectStreak: newStreak });
+        correctStreakRef.current = newStreak;
+      } else {
+        correctStreakRef.current = 0;
+        delta = scoreDelta(word.level, result);
+      }
 
       if (result !== "correct") {
         // Add to review list (wrong or I don't know).
@@ -112,7 +129,7 @@ export function FlashcardGame({
         void load();
       }, 2000);
     },
-    [busy, load, mode, onReviewChange, onScoreChange, reveal, word],
+    [busy, load, mode, onReviewChange, onScoreChange, reveal, source, word],
   );
 
   const correctAnswerText = useMemo(() => (word && mode ? getAnswerText(mode, word) : ""), [mode, word]);
@@ -162,7 +179,7 @@ export function FlashcardGame({
           </div>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {options.map((opt, idx) => {
+            {options.map((opt) => {
               const label =
                 opt.kind === "dontKnow"
                   ? "I don’t know"
@@ -212,7 +229,8 @@ export function FlashcardGame({
 
           {reveal && (
             <div className="text-sm text-zinc-500">
-              Tip: “I don’t know” adds it to your review list without penalty.
+              Tip: Score includes your word level plus a streak bonus (+1 on your 2nd correct in a row, +2 on
+              the 3rd, …). Wrong or “I don’t know” resets the streak; “I don’t know” does not subtract points.
             </div>
           )}
         </motion.div>

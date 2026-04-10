@@ -2,8 +2,10 @@
 
 import { LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { useMemo } from "react";
 import { signOut } from "@/app/actions/auth";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export function Navbar({
   email,
@@ -24,13 +26,12 @@ export function Navbar({
   return (
     <div className="w-full border-b border-zinc-200/70 bg-white/70 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500" />
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-zinc-900">Laoshi Xu</div>
-            <div className="text-xs text-zinc-500">Mandarin trainer</div>
-          </div>
-        </div>
+        <Link
+          href="/"
+          className="flex min-w-0 shrink items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
+        >
+          <BrandLogo className="h-10 w-10 rounded-full object-cover ring-1 ring-zinc-200/80 sm:h-11 sm:w-11" />
+        </Link>
 
         <div className="flex items-center gap-2">
           <div className="inline-flex h-10 items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 shadow-sm">

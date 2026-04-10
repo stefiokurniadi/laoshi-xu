@@ -15,7 +15,11 @@ export async function FlashcardShell({
     <FlashcardShellClient
       email={email}
       initialScore={initialScore}
-      initialReviewRows={initialRows.map((r) => ({ last_seen: r.last_seen, word: r.word }))}
+      initialReviewRows={initialRows.map((r) => ({
+        last_seen: r.last_seen,
+        times_seen: r.times_seen ?? 1,
+        word: r.word,
+      }))}
       userId={userId}
     />
   );

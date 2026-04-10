@@ -12,3 +12,9 @@ export type Option =
   | { kind: "word"; word: HskWord }
   | { kind: "dontKnow" };
 
+export type ReviewListRow = {
+  last_seen: string;
+  times_seen: number;
+  word: HskWord;
+};
+

@@ -1,5 +1,17 @@
 import type { HskWord, Option, QuestionMode } from "@/lib/types";
 
+export const QUESTION_MODES: QuestionMode[] = ["EN_TO_ZH", "HZ_TO_EN", "PY_TO_MIX"];
+
+export function parseQuestionMode(s: string | null): QuestionMode | null {
+  if (!s) return null;
+  return QUESTION_MODES.includes(s as QuestionMode) ? (s as QuestionMode) : null;
+}
+
+/** Extra points on top of base level score: 2nd consecutive correct +1, 3rd +2, 4th +3, … */
+export function consecutiveCorrectBonus(newStreak: number): number {
+  return Math.max(0, newStreak - 1);
+}
+
 export function rotateMode(prev: QuestionMode | null): QuestionMode {
   const modes: QuestionMode[] = ["EN_TO_ZH", "HZ_TO_EN", "PY_TO_MIX"];
   const pick = () => modes[Math.floor(Math.random() * modes.length)]!;
@@ -23,10 +35,17 @@ export function getAnswerText(mode: QuestionMode, w: HskWord) {
   return `${w.english} · ${w.hanzi}`;
 }
 
-export function scoreDelta(level: number, result: "correct" | "wrong" | "dontKnow") {
+export function scoreDelta(
+  level: number,
+  result: "correct" | "wrong" | "dontKnow",
+  opts?: { newCorrectStreak?: number },
+) {
   const L = clamp(level, 1, 9);
   if (result === "dontKnow") return 0;
-  if (result === "correct") return L;
+  if (result === "correct") {
+    const streak = opts?.newCorrectStreak ?? 1;
+    return L + consecutiveCorrectBonus(streak);
+  }
   return -(10 - L);
 }
 

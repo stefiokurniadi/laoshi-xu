@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BookOpen } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { signInWithEmail, signUpWithEmail } from "@/app/actions/auth";
 
 export function AuthCard({ authError }: { authError?: string | null }) {
@@ -9,21 +9,13 @@ export function AuthCard({ authError }: { authError?: string | null }) {
   const [localError, setLocalError] = useState<string | null>(null);
 
   const title = useMemo(() => (mode === "signin" ? "Sign in" : "Create account"), [mode]);
-  const subtitle = useMemo(
-    () => (mode === "signin" ? "Increase Your HSK Level Everyday" : "Increase Your HSK Level Everyday"),
-    [mode],
-  );
-
   return (
     <div className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-white">
-          <BookOpen className="h-5 w-5" />
-        </div>
-        <div>
-          <div className="text-lg font-semibold text-zinc-900">Laoshi Xu</div>
-          <div className="text-sm text-zinc-500">{subtitle}</div>
-        </div>
+      <div className="mb-6 flex justify-center">
+        <BrandLogo
+          priority
+          className="h-36 w-36 rounded-full border border-zinc-200/80 shadow-md ring-2 ring-zinc-100 sm:h-44 sm:w-44"
+        />
       </div>
 
       {authError || localError ? (

@@ -49,8 +49,13 @@ create table if not exists public.failed_words (
   user_id uuid not null references auth.users(id) on delete cascade,
   word_id bigint not null references public.hsk_words(id) on delete cascade,
   last_seen timestamptz not null default now(),
+  times_seen integer not null default 1,
   primary key (user_id, word_id)
 );
+
+-- Existing databases: add counter if missing
+alter table public.failed_words
+  add column if not exists times_seen integer not null default 1;
 
 create index if not exists failed_words_user_id_last_seen_idx
 on public.failed_words(user_id, last_seen desc);
@@ -77,6 +82,29 @@ create policy "failed_words_delete_own"
 on public.failed_words
 for delete
 using (auth.uid() = user_id);
+
+-- Add / bump review entry (increments times_seen on repeat misses / skips)
+create or replace function public.touch_failed_word(p_word_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+
+  insert into public.failed_words (user_id, word_id, last_seen, times_seen)
+  values (auth.uid(), p_word_id, now(), 1)
+  on conflict (user_id, word_id) do update
+    set last_seen = excluded.last_seen,
+        times_seen = failed_words.times_seen + 1;
+end;
+$$;
+
+revoke all on function public.touch_failed_word(bigint) from public;
+grant execute on function public.touch_failed_word(bigint) to authenticated;
 
 -- 4) Atomic point increments (avoid races)
 create or replace function public.increment_total_points(delta integer)
