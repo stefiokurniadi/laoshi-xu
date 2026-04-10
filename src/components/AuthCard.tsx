@@ -58,6 +58,8 @@ export function AuthCard({
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [localError, setLocalError] = useState<string | null>(null);
   const [showNotice, setShowNotice] = useState(Boolean(authNotice));
+  const [stickyAuthError, setStickyAuthError] = useState<string | null>(authError ?? null);
+  const [stickyResendEmail, setStickyResendEmail] = useState<string | null>(resendEmail ?? null);
 
   useEffect(() => {
     setShowNotice(Boolean(authNotice));
@@ -67,10 +69,24 @@ export function AuthCard({
     router.replace("/");
   }, [router]);
 
+  // Consume query-string auth errors into local state, then clean the URL so refresh doesn't keep it.
+  useEffect(() => {
+    if (!authError) return;
+    setStickyAuthError(authError);
+    setStickyResendEmail(resendEmail ?? null);
+    clearQuery();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authError]);
+
   const dismissNotice = useCallback(() => {
     setShowNotice(false);
     clearQuery();
   }, [clearQuery]);
+
+  const dismissError = useCallback(() => {
+    setStickyAuthError(null);
+    setStickyResendEmail(null);
+  }, []);
 
   return (
     <>
@@ -103,12 +119,22 @@ export function AuthCard({
           </div>
         </div>
 
-        {authError || localError ? (
+        {stickyAuthError || localError ? (
           <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-            <p>{authError ?? localError}</p>
-            {resendEmail ? (
+            <div className="flex items-start justify-between gap-3">
+              <p className="min-w-0 flex-1">{stickyAuthError ?? localError}</p>
+              <button
+                type="button"
+                onClick={dismissError}
+                className="shrink-0 rounded-md px-1.5 py-0.5 text-lg leading-none text-rose-900/70 hover:bg-rose-200/60 hover:text-rose-950"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+            {stickyResendEmail ? (
               <form action={resendSignupConfirmation} className="mt-3">
-                <input type="hidden" name="email" value={resendEmail} />
+                <input type="hidden" name="email" value={stickyResendEmail} />
                 <button
                   type="submit"
                   className="w-full rounded-lg border border-rose-300 bg-white px-3 py-2.5 text-sm font-semibold text-rose-950 shadow-sm hover:bg-rose-50"
@@ -142,7 +168,7 @@ export function AuthCard({
               type="email"
               autoComplete="email"
               required
-              defaultValue={resendEmail ?? undefined}
+              defaultValue={stickyResendEmail ?? resendEmail ?? undefined}
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-0 focus:border-zinc-400"
               placeholder="you@example.com"
             />

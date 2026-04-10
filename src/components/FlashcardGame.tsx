@@ -255,11 +255,11 @@ export function FlashcardGame({
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_60px_rgba(0,0,0,0.06)]">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            {word ? `HSK ${word.level}` : "Loading"}
-          </div>
-          <div className="mt-1 text-sm font-semibold text-zinc-900">
-            {source === "review" ? "Review" : "New word"}
+          <div className="text-sm font-semibold tracking-wide text-zinc-600">
+            <span className="uppercase">{word ? `HSK ${word.level}` : "Loading"}</span>
+            {word && source === "review" ? (
+              <span className="font-medium text-zinc-400"> - Previous Mistake</span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -273,7 +273,7 @@ export function FlashcardGame({
           transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           className="space-y-4"
         >
-          <div className="rounded-3xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-6">
+          <div className="rounded-3xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-6 shadow-sm">
             <div className="text-xs font-semibold text-zinc-500">{prompt?.label ?? "…"}</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
               {prompt?.value ?? "Loading…"}
@@ -295,7 +295,8 @@ export function FlashcardGame({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="rounded-3xl border border-zinc-200 bg-zinc-50/60 p-3 shadow-sm">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {wordOptionsShown.map((opt, i) => {
               const label = word && mode ? getAnswerText(mode, opt.word) : opt.word.english;
 
@@ -310,9 +311,9 @@ export function FlashcardGame({
               const revealedStyle = !showState
                 ? ""
                 : isCorrectWord
-                  ? "z-[1] border-emerald-600 bg-emerald-100 text-emerald-950 ring-2 ring-emerald-500/40"
+                  ? "z-[1] !bg-emerald-100 !text-emerald-950"
                   : isPicked
-                    ? "z-[1] border-rose-600 bg-rose-100 text-rose-950 ring-2 ring-rose-500/40"
+                    ? "z-[1] !bg-rose-100 !text-rose-950"
                     : "opacity-45";
 
               return (
@@ -328,7 +329,7 @@ export function FlashcardGame({
                   }}
                   disabled={busy || Boolean(reveal)}
                   onClick={() => void pick(opt)}
-                  className={`${base} border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50 ${revealedStyle}`}
+                  className={`${base} border-zinc-200 bg-white text-zinc-900 hover:bg-white ${revealedStyle}`}
                 >
                   <div className="leading-snug">{label}</div>
                 </motion.button>
@@ -348,7 +349,7 @@ export function FlashcardGame({
               onClick={() => void pickDontKnow()}
               className={`w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed sm:col-span-2 ${
                 reveal?.pickedKey === "dontKnow"
-                  ? "z-[1] border-amber-600 bg-amber-200 text-amber-950 ring-2 ring-amber-500/40"
+                  ? "z-[1] !bg-amber-200 !text-amber-950"
                   : idkExhausted
                     ? "border-zinc-200 bg-zinc-100 text-zinc-400"
                     : "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
@@ -363,6 +364,7 @@ export function FlashcardGame({
                 </span>
               )}
             </motion.button>
+          </div>
           </div>
 
           {reveal && (

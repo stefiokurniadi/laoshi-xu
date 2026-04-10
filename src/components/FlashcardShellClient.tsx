@@ -28,12 +28,16 @@ export function FlashcardShellClient({
       <Navbar email={email} score={score} scoreDelta={delta} />
 
       <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-zinc-900">Daily practice</div>
-            <div className="mt-1 text-sm text-zinc-500">Answer fast, review mistakes, level up your HSK.</div>
+        <div className="mb-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-zinc-900">Daily practice</div>
+            </div>
+            <LeaderboardLauncher userId={userId} />
           </div>
-          <LeaderboardLauncher userId={userId} />
+          <div className="mt-1 hidden text-sm text-zinc-500 sm:block">
+            Answer fast, review mistakes, level up your HSK.
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.85fr]">

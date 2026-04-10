@@ -25,6 +25,7 @@ export function Navbar({
   }, [scoreDelta]);
 
   const ratingLabel = useMemo(() => playerRatingLabel(score), [score]);
+  const ratingShort = useMemo(() => ratingLabel.replace(/^Rating:\s*/i, ""), [ratingLabel]);
 
   return (
     <div className="w-full border-b border-zinc-200/70 bg-white/70 backdrop-blur">
@@ -34,14 +35,30 @@ export function Navbar({
           className="flex min-w-0 shrink items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
         >
           <BrandLogo className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 sm:h-11 sm:w-11" />
-          <span className="truncate text-base font-semibold tracking-tight text-zinc-900">
+          <span className="hidden truncate text-base font-semibold tracking-tight text-zinc-900 sm:inline">
             Laoshi Xu
           </span>
+          {email ? (
+            <span className="min-w-0 sm:hidden">
+              <span
+                className="block max-w-[min(48vw,12rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
+                title="User Rating"
+              >
+                User Rating:
+              </span>
+              <span
+                className="mt-0.5 block max-w-[min(48vw,12rem)] truncate text-[12px] font-semibold text-zinc-800"
+                title={ratingShort}
+              >
+                {ratingShort}
+              </span>
+            </span>
+          ) : null}
         </Link>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
           {email ? (
-            <div className="flex min-w-0 max-w-[min(46vw,10rem)] shrink flex-col items-end text-right sm:max-w-[15rem] md:max-w-[20rem]">
+            <div className="hidden min-w-0 max-w-[min(46vw,10rem)] shrink flex-col items-end text-right sm:flex sm:max-w-[15rem] md:max-w-[20rem]">
               <span
                 className="w-full truncate text-xs text-zinc-600 sm:text-sm"
                 title={email}
@@ -50,9 +67,9 @@ export function Navbar({
               </span>
               <span
                 className="mt-0.5 w-full truncate text-[10px] font-medium text-zinc-500 sm:text-xs"
-                title={ratingLabel}
+                title={ratingShort}
               >
-                {ratingLabel}
+                {ratingShort}
               </span>
             </div>
           ) : null}

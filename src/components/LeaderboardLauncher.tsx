@@ -15,7 +15,7 @@ export function LeaderboardLauncher({ userId }: { userId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-sm font-semibold text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50"
+        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 sm:px-3.5 sm:py-2 sm:text-sm"
       >
         <Trophy className="h-4 w-4 text-amber-600" aria-hidden />
         Leaderboard
