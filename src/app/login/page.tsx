@@ -10,6 +10,7 @@ export default async function LoginPage(props: PageProps) {
   const authError = typeof searchParams.authError === "string" ? searchParams.authError : null;
   const authNotice = typeof searchParams.authNotice === "string" ? searchParams.authNotice : null;
   const resendEmail = typeof searchParams.resendEmail === "string" ? searchParams.resendEmail : null;
+  const verifyExpired = searchParams.verifyExpired === "1";
   const showGoogleLogin = await getGoogleLoginEnabled();
 
   return (
@@ -19,6 +20,7 @@ export default async function LoginPage(props: PageProps) {
           authError={authError}
           authNotice={authNotice}
           resendEmail={resendEmail}
+          verifyExpired={verifyExpired}
           showGoogleLogin={showGoogleLogin}
         />
       </div>

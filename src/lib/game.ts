@@ -29,10 +29,16 @@ export function getPrompt(mode: QuestionMode, w: HskWord) {
   return { label: "Pinyin", value: w.pinyin };
 }
 
+/** Primary (e.g. hanzi / English) and secondary (pinyin / other script) for option styling. */
+export function getAnswerTextParts(mode: QuestionMode, w: HskWord): [string, string] {
+  if (mode === "EN_TO_ZH") return [w.hanzi, w.pinyin];
+  if (mode === "HZ_TO_EN") return [w.english, w.pinyin];
+  return [w.english, w.hanzi];
+}
+
 export function getAnswerText(mode: QuestionMode, w: HskWord) {
-  if (mode === "EN_TO_ZH") return `${w.hanzi} · ${w.pinyin}`;
-  if (mode === "HZ_TO_EN") return `${w.english} · ${w.pinyin}`;
-  return `${w.english} · ${w.hanzi}`;
+  const [a, b] = getAnswerTextParts(mode, w);
+  return `${a} · ${b}`;
 }
 
 export function scoreDelta(

@@ -96,11 +96,14 @@ export function AuthCard({
   authError,
   authNotice,
   resendEmail,
+  verifyExpired = false,
   showGoogleLogin = true,
 }: {
   authError?: string | null;
   authNotice?: string | null;
   resendEmail?: string | null;
+  /** Set when email confirmation link expired (`/auth/confirm` → login). */
+  verifyExpired?: boolean;
   /** Controlled by `app_settings.google_login_enabled` (see `/tiniwinibiti`). */
   showGoogleLogin?: boolean;
 }) {
@@ -111,10 +114,15 @@ export function AuthCard({
   const [showNotice, setShowNotice] = useState(Boolean(authNotice));
   const [stickyAuthError, setStickyAuthError] = useState<string | null>(authError ?? null);
   const [stickyResendEmail, setStickyResendEmail] = useState<string | null>(resendEmail ?? null);
+  const [stickyVerifyExpired, setStickyVerifyExpired] = useState(verifyExpired);
 
   useEffect(() => {
     setShowNotice(Boolean(authNotice));
   }, [authNotice]);
+
+  useEffect(() => {
+    if (verifyExpired) setStickyVerifyExpired(true);
+  }, [verifyExpired]);
 
   const clearQuery = useCallback(() => {
     router.replace(pathname || "/");
@@ -125,6 +133,7 @@ export function AuthCard({
     if (!authError) return;
     setStickyAuthError(authError);
     setStickyResendEmail(resendEmail ?? null);
+    if (verifyExpired) setStickyVerifyExpired(true);
     clearQuery();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authError]);
@@ -137,6 +146,7 @@ export function AuthCard({
   const dismissError = useCallback(() => {
     setStickyAuthError(null);
     setStickyResendEmail(null);
+    setStickyVerifyExpired(false);
   }, []);
 
   return (
@@ -183,6 +193,12 @@ export function AuthCard({
                 ×
               </button>
             </div>
+            {stickyVerifyExpired ? (
+              <p className="mt-2 text-xs leading-relaxed text-rose-900/85">
+                Switch to <strong>Sign up</strong>, enter your email, and submit to receive a fresh confirmation
+                link.
+              </p>
+            ) : null}
             {stickyResendEmail ? (
               <form action={resendSignupConfirmation} className="relative mt-3">
                 <HoneypotField />

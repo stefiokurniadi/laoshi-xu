@@ -25,6 +25,10 @@ for update
 using (auth.uid() = id)
 with check (auth.uid() = id);
 
+-- First flashcard interaction (scored pick, wrong answer, or “I don’t know”). Used to hide never-played users from the leaderboard.
+alter table public.profiles
+  add column if not exists first_played_at timestamptz;
+
 -- 2) HSK words
 create table if not exists public.hsk_words (
   id bigint generated always as identity primary key,
@@ -100,6 +104,10 @@ begin
   on conflict (user_id, word_id) do update
     set last_seen = excluded.last_seen,
         times_seen = failed_words.times_seen + 1;
+
+  update public.profiles
+  set first_played_at = coalesce(first_played_at, now())
+  where id = auth.uid();
 end;
 $$;
 
@@ -204,6 +212,16 @@ $$;
 revoke all on function public.consume_idk_quota(date) from public;
 grant execute on function public.consume_idk_quota(date) to authenticated;
 
+-- Backfill leaderboard eligibility for existing accounts (after failed_words / idk_daily_uses exist).
+update public.profiles p
+set first_played_at = now()
+where p.first_played_at is null
+  and (
+    p.total_points <> 0
+    or exists (select 1 from public.failed_words f where f.user_id = p.id)
+    or exists (select 1 from public.idk_daily_uses i where i.user_id = p.id and i.uses > 0)
+  );
+
 -- 4) Atomic point increments (avoid races)
 create or replace function public.increment_total_points(delta integer)
 returns integer
@@ -215,7 +233,9 @@ declare
   new_total integer;
 begin
   update public.profiles
-  set total_points = total_points + delta
+  set
+    total_points = total_points + delta,
+    first_played_at = coalesce(first_played_at, now())
   where id = auth.uid()
   returning total_points into new_total;
 
@@ -232,6 +252,7 @@ grant execute on function public.increment_total_points(integer) to authenticate
 
 -- Leaderboard: top 20 by points; emails masked in RPC (first 3 chars + ***), except the caller’s own row.
 -- Excludes superadmin@laoshixu.com (must match SUPERADMIN_EMAIL / src/lib/superadmin.ts).
+-- Excludes users who have never played (profiles.first_played_at is null).
 create or replace function public.get_leaderboard_snapshot()
 returns jsonb
 language plpgsql
@@ -268,6 +289,7 @@ begin
         row_number() over (order by p.total_points desc, p.id asc) as rnk
       from public.profiles p
       where coalesce(lower(trim(p.email)), '') <> 'superadmin@laoshixu.com'
+        and p.first_played_at is not null
     ),
     top20 as (
       select * from ranked where rnk <= 20
@@ -310,6 +332,7 @@ begin
       row_number() over (order by p.total_points desc, p.id asc) as rnk
     from public.profiles p
     where coalesce(lower(trim(p.email)), '') <> 'superadmin@laoshixu.com'
+      and p.first_played_at is not null
   ) r
   where r.id = viewer;
 

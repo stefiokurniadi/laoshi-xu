@@ -6,6 +6,7 @@ import type { HskWord, Option, QuestionMode } from "@/lib/types";
 import {
   buildOptions,
   getAnswerText,
+  getAnswerTextParts,
   getPrompt,
   rotateMode,
   scoreDelta,
@@ -525,12 +526,12 @@ export function FlashcardGame({
           <div className="rounded-3xl border border-zinc-200 bg-zinc-50/60 p-3 shadow-sm">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {wordOptionsShown.map((opt, i) => {
-              const label = word && mode ? getAnswerText(mode, opt.word) : opt.word.english;
-
               const optKey = `word:${opt.word.id}`;
               const isPicked = reveal?.pickedKey === optKey;
               const isCorrectWord = Boolean(word && opt.word.id === word.id);
               const showState = Boolean(reveal);
+              const [primaryText, secondaryText] =
+                word && mode ? getAnswerTextParts(mode, opt.word) : [opt.word.english, null as string | null];
 
               const base =
                 "w-full rounded-2xl border px-4 py-4 text-left text-base font-semibold transition-colors shadow-sm disabled:cursor-default disabled:opacity-100";
@@ -542,6 +543,12 @@ export function FlashcardGame({
                   : isPicked
                     ? "z-[1] !bg-rose-100 !text-rose-950"
                     : "opacity-45";
+
+              const primaryCls = showState ? "text-inherit" : "text-zinc-950";
+              const dotCls = showState ? "text-inherit opacity-55" : "text-zinc-400";
+              const secondaryCls = showState
+                ? "text-inherit font-medium opacity-90"
+                : "font-medium text-zinc-500";
 
               return (
                 <motion.button
@@ -558,7 +565,17 @@ export function FlashcardGame({
                   onClick={() => void pick(opt)}
                   className={`${base} border-zinc-200 bg-white text-zinc-900 hover:bg-white ${revealedStyle}`}
                 >
-                  <div className="leading-snug">{label}</div>
+                  <div className="leading-snug">
+                    <span className={primaryCls}>{primaryText}</span>
+                    {secondaryText != null ? (
+                      <>
+                        <span className={`mx-1.5 font-normal ${dotCls}`} aria-hidden>
+                          ·
+                        </span>
+                        <span className={secondaryCls}>{secondaryText}</span>
+                      </>
+                    ) : null}
+                  </div>
                 </motion.button>
               );
               })}
