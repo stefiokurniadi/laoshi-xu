@@ -41,6 +41,7 @@ export function FlashcardGame({
   /** Called after review list mutations so the sidebar can refetch without relying on Realtime alone. */
   onReviewChange?: () => void;
 }) {
+  const roundStorageKey = useMemo(() => `laoshi-xu:flashcardGame:round:${userId}`, [userId]);
   const [mode, setMode] = useState<QuestionMode | null>(null);
   const [word, setWord] = useState<HskWord | null>(null);
   const [options, setOptions] = useState<Option[]>([]);
@@ -56,6 +57,54 @@ export function FlashcardGame({
   const pendingNextRef = useRef<Promise<{ payload: ApiPayload; nextMode: QuestionMode }> | null>(null);
   const [idkRemaining, setIdkRemaining] = useState(IDK_DAILY_LIMIT);
 
+  const restoreRound = useCallback((): boolean => {
+    if (typeof window === "undefined") return false;
+    try {
+      const raw = window.localStorage.getItem(roundStorageKey);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw) as {
+        mode: QuestionMode;
+        word: HskWord;
+        options: Option[];
+        source: "hsk" | "review";
+        reveal: null | { correctId: number; pickedKey: string };
+        afterAnswerTipIndex: number;
+        savedAt: number;
+      };
+      // Basic validation / forward-compat guard.
+      if (!parsed?.word?.id || !parsed?.mode || !Array.isArray(parsed?.options)) return false;
+
+      setMode(parsed.mode);
+      setWord(parsed.word);
+      setOptions(parsed.options);
+      setSource(parsed.source ?? "hsk");
+      setReveal(parsed.reveal ?? null);
+      setAfterAnswerTipIndex(typeof parsed.afterAnswerTipIndex === "number" ? parsed.afterAnswerTipIndex : 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [roundStorageKey]);
+
+  const persistRound = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!word || !mode) return;
+    try {
+      const payload = {
+        mode,
+        word,
+        options,
+        source,
+        reveal,
+        afterAnswerTipIndex,
+        savedAt: Date.now(),
+      };
+      window.localStorage.setItem(roundStorageKey, JSON.stringify(payload));
+    } catch {
+      // ignore storage failures (private mode/quota/etc)
+    }
+  }, [afterAnswerTipIndex, mode, options, reveal, roundStorageKey, source, word]);
+
   const syncIdkFromServer = useCallback(async () => {
     try {
       const r = await fetchIdkRemaining(localDateKey());
@@ -68,6 +117,10 @@ export function FlashcardGame({
   useEffect(() => {
     void syncIdkFromServer();
   }, [syncIdkFromServer]);
+
+  useEffect(() => {
+    persistRound();
+  }, [persistRound]);
 
   useEffect(() => {
     scoreRef.current = initialScore;
@@ -135,6 +188,7 @@ export function FlashcardGame({
   }, [load, mode]);
 
   useEffect(() => {
+    if (restoreRound()) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

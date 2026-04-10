@@ -63,11 +63,17 @@ export async function getDistractors(
   level: number,
   excludeId: number,
   n: number,
-  options: { shapeTarget: Pick<HskWord, "hanzi" | "pinyin">; overlapHanzi?: string },
+  options: {
+    shapeTarget: Pick<HskWord, "hanzi" | "pinyin">;
+    overlapHanzi?: string;
+    /** If false, do not apply shape matching (much larger pool). */
+    strictShape?: boolean;
+  },
 ): Promise<HskWord[]> {
   const supabase = await createSupabaseServerClient();
 
   const fetchLimit = options.overlapHanzi ? 1200 : 900;
+  const strictShape = options.strictShape ?? true;
 
   let q = supabase
     .from("hsk_words")
@@ -81,7 +87,7 @@ export async function getDistractors(
   const raw = (data ?? []).filter((w) => isUsableEnglishGloss(w.english)) as HskWord[];
   if (raw.length === 0) return [];
 
-  const pool = raw.filter((w) => matchesWordShape(w, options.shapeTarget));
+  const pool = strictShape ? raw.filter((w) => matchesWordShape(w, options.shapeTarget)) : raw;
   if (pool.length === 0) return [];
 
   const chars = options.overlapHanzi ? uniqueHanziChars(options.overlapHanzi) : [];
@@ -114,6 +120,22 @@ export async function getDistractors(
     picked.push(copy.splice(idx, 1)[0]!);
   }
   return picked;
+}
+
+/** Rows in `failed_words` for the current user (for tuning review mix frequency). */
+export async function countUserFailedWords(): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from("failed_words")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id);
+  if (error) return 0;
+  return count ?? 0;
 }
 
 export async function getRandomReviewWord(): Promise<HskWord | null> {

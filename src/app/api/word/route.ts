@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { parseQuestionMode } from "@/lib/game";
-import { getDistractors, getRandomWord, getRandomReviewWord } from "@/lib/hsk.server";
+import {
+  countUserFailedWords,
+  getDistractors,
+  getRandomWord,
+  getRandomReviewWord,
+} from "@/lib/hsk.server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -32,16 +37,40 @@ export async function GET(request: Request) {
     else maxLevel = 9;
   }
 
-  const shouldMixReview = Math.random() < 0.25;
+  /** Larger review backlogs → higher chance to draw a review word. */
+  let reviewMixProbability = 0.25;
+  if (user) {
+    const failedCount = await countUserFailedWords();
+    if (failedCount > 20) reviewMixProbability = 0.7;
+    else if (failedCount > 10) reviewMixProbability = 0.55;
+  }
+  const shouldMixReview = Math.random() < reviewMixProbability;
   const reviewWord = shouldMixReview ? await getRandomReviewWord() : null;
   const word = reviewWord ?? (await getRandomWord(maxLevel));
 
   const overlapHanzi =
     nextMode === "HZ_TO_EN" || nextMode === "PY_TO_MIX" ? word.hanzi : undefined;
-  const distractors = await getDistractors(word.level, word.id, 3, {
+  const primary = await getDistractors(word.level, word.id, 3, {
     overlapHanzi,
     shapeTarget: { hanzi: word.hanzi, pinyin: word.pinyin },
+    strictShape: true,
   });
+
+  let distractors = primary;
+  if (distractors.length < 3) {
+    const need = 3 - distractors.length;
+    const fallback = await getDistractors(word.level, word.id, need * 3, {
+      shapeTarget: { hanzi: word.hanzi, pinyin: word.pinyin },
+      strictShape: false,
+    });
+    const existing = new Set(distractors.map((w) => w.id));
+    for (const w of fallback) {
+      if (distractors.length >= 3) break;
+      if (existing.has(w.id)) continue;
+      distractors = [...distractors, w];
+      existing.add(w.id);
+    }
+  }
 
   return NextResponse.json({ word, distractors, source: reviewWord ? "review" : "hsk" });
 }

@@ -23,20 +23,22 @@ export function FlashcardShellClient({
   const [reviewEpoch, setReviewEpoch] = useState(0);
 
   return (
-    <div className="relative flex min-h-[100svh] flex-col overflow-hidden bg-gradient-to-b from-white via-white to-zinc-50">
-      <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-200/60 via-fuchsia-200/40 to-amber-200/40 blur-3xl" />
+    <div className="relative flex min-h-[100svh] flex-col overflow-hidden bg-gradient-to-b from-[#f0f6f7] via-[#e4eef0] to-[#d6e6e8]">
+      <div
+        className="pointer-events-none absolute -top-28 left-1/2 h-[22rem] w-[min(44rem,100vw)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_80%_60%_at_50%_30%,rgba(26,81,86,0.13),transparent_70%)] blur-3xl"
+        aria-hidden
+      />
       <Navbar email={email} score={score} scoreDelta={delta} />
 
-      <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">
+      <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-6">
         <div className="mb-6">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-zinc-900">Daily practice</div>
+              <div className="text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
+                MISSION: Gain more points & Level up
+              </div>
             </div>
             <LeaderboardLauncher userId={userId} />
-          </div>
-          <div className="mt-1 hidden text-sm text-zinc-500 sm:block">
-            Answer fast, review mistakes, level up your HSK.
           </div>
         </div>
 

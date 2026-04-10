@@ -96,25 +96,19 @@ export function AuthCard({
         ) : null}
       </AnimatePresence>
 
-      <div className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white px-6 py-7 shadow-sm sm:max-w-md sm:px-8 sm:py-8">
         <div className="mb-6 flex flex-col items-center gap-4">
           <BrandLogo
             priority
-            className="h-36 w-36 rounded-full border border-zinc-200/80 shadow-md ring-2 ring-zinc-100 sm:h-44 sm:w-44"
+            className="h-32 w-32 rounded-full border border-zinc-200/80 shadow-md ring-2 ring-zinc-100 sm:h-36 sm:w-36"
           />
-          <div className="flex max-w-[22rem] flex-col items-center gap-2 text-center">
-            <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-500">LAOSHI XU</p>
+          <div className="flex w-full max-w-[18rem] flex-col items-center gap-2 text-center">
+            <p className="text-[19px] font-bold tracking-[0.2em] text-zinc-900">LAOSHI XU</p>
             <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-base font-semibold tracking-tight text-zinc-900">
               <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold tracking-[0.12em] text-emerald-900">
                 FREE
               </span>
               <span>Mandarin Flashcard</span>
-            </p>
-            <p className="text-[13px] leading-relaxed text-zinc-500">
-              Level Up from{" "}
-              <span className="font-semibold tabular-nums text-zinc-800">HSK 1</span>
-              {" to "}
-              <span className="font-semibold tabular-nums text-zinc-800">HSK 9</span>
             </p>
           </div>
         </div>
@@ -137,7 +131,7 @@ export function AuthCard({
                 <input type="hidden" name="email" value={stickyResendEmail} />
                 <button
                   type="submit"
-                  className="w-full rounded-lg border border-rose-300 bg-white px-3 py-2.5 text-sm font-semibold text-rose-950 shadow-sm hover:bg-rose-50"
+                  className="w-full rounded-lg border border-rose-300 bg-white px-5 py-2.5 text-sm font-semibold text-rose-950 shadow-sm hover:bg-rose-50 sm:px-6"
                 >
                   Resend confirmation email
                 </button>
@@ -169,7 +163,7 @@ export function AuthCard({
               autoComplete="email"
               required
               defaultValue={stickyResendEmail ?? resendEmail ?? undefined}
-              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-0 focus:border-zinc-400"
+              className="w-full rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm text-zinc-900 outline-none ring-0 focus:border-zinc-400 sm:px-6"
               placeholder="you@example.com"
             />
           </div>
@@ -181,7 +175,7 @@ export function AuthCard({
               autoComplete={mode === "signin" ? "current-password" : "new-password"}
               minLength={6}
               required
-              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-0 focus:border-zinc-400"
+              className="w-full rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm text-zinc-900 outline-none ring-0 focus:border-zinc-400 sm:px-6"
               placeholder="••••••••"
             />
           </div>
@@ -195,7 +189,7 @@ export function AuthCard({
                 autoComplete="new-password"
                 minLength={6}
                 required
-                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-0 focus:border-zinc-400"
+                className="w-full rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm text-zinc-900 outline-none ring-0 focus:border-zinc-400 sm:px-6"
                 placeholder="••••••••"
               />
             </div>
@@ -203,7 +197,7 @@ export function AuthCard({
 
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-[#1a5156] px-6 py-3 text-sm font-semibold text-white hover:bg-[#164448] active:bg-[#123a3e] sm:px-8"
           >
             {mode === "signin" ? "Sign in" : "Create account"}
           </button>
@@ -213,7 +207,7 @@ export function AuthCard({
           <button
             type="button"
             onClick={() => setMode("signup")}
-            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-6 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 sm:px-8"
           >
             Create account
           </button>
@@ -221,7 +215,7 @@ export function AuthCard({
           <button
             type="button"
             onClick={() => setMode("signin")}
-            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-6 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 sm:px-8"
           >
             Back to sign in
           </button>

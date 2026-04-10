@@ -15,9 +15,9 @@ export function LeaderboardLauncher({ userId }: { userId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 sm:px-3.5 sm:py-2 sm:text-sm"
+        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-black/10 bg-[#1a5156] px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#164448] sm:px-3.5 sm:py-2 sm:text-sm"
       >
-        <Trophy className="h-4 w-4 text-amber-600" aria-hidden />
+        <Trophy className="h-4 w-4 text-amber-300" aria-hidden />
         Leaderboard
       </button>
       {open ? (
@@ -29,6 +29,10 @@ export function LeaderboardLauncher({ userId }: { userId: string }) {
       ) : null}
     </>
   );
+}
+
+function ratingShortLabel(totalPoints: number): string {
+  return playerRatingLabel(totalPoints).replace(/^Rating:\s*/i, "");
 }
 
 function LeaderboardModal({
@@ -91,7 +95,7 @@ function LeaderboardModal({
       >
         <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
           <div className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-amber-600" aria-hidden />
+            <Trophy className="h-5 w-5 text-[#1a5156]" aria-hidden />
             <h2 id={titleId} className="text-base font-semibold text-zinc-900">
               Leaderboard
             </h2>
@@ -120,7 +124,7 @@ function LeaderboardModal({
                   <th className="px-2 py-2 font-semibold sm:px-3">Rank</th>
                   <th className="px-2 py-2 font-semibold sm:px-3">Email</th>
                   <th className="px-2 py-2 font-semibold sm:px-3">Rating</th>
-                  <th className="px-2 py-2 text-right font-semibold sm:px-3">Score</th>
+                  <th className="px-2 py-2 text-right font-semibold sm:px-3">Point</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,7 +149,7 @@ function LeaderboardModal({
                       key={`${row.profileId}-${row.rank}`}
                       className={
                         highlight
-                          ? "bg-indigo-50 ring-1 ring-inset ring-indigo-200/80"
+                          ? "bg-[#1a5156]/[0.09] ring-1 ring-inset ring-[#1a5156]/35"
                           : "border-b border-zinc-100 last:border-0"
                       }
                     >
@@ -156,8 +160,8 @@ function LeaderboardModal({
                         {row.displayEmail}
                       </td>
                       <td className="max-w-[7.5rem] px-2 py-2.5 text-[10px] leading-snug text-zinc-600 sm:max-w-[13rem] sm:px-3 sm:text-xs">
-                        <span className="line-clamp-2 sm:line-clamp-none" title={playerRatingLabel(row.totalPoints)}>
-                          {playerRatingLabel(row.totalPoints)}
+                        <span className="line-clamp-2 sm:line-clamp-none" title={ratingShortLabel(row.totalPoints)}>
+                          {ratingShortLabel(row.totalPoints)}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2.5 text-right font-semibold tabular-nums text-zinc-900 sm:px-3">
