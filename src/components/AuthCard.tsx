@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { signInWithEmail, signUpWithEmail } from "@/app/actions/auth";
 
@@ -8,14 +8,28 @@ export function AuthCard({ authError }: { authError?: string | null }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const title = useMemo(() => (mode === "signin" ? "Sign in" : "Create account"), [mode]);
   return (
     <div className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-      <div className="mb-6 flex justify-center">
+      <div className="mb-6 flex flex-col items-center gap-4">
         <BrandLogo
           priority
           className="h-36 w-36 rounded-full border border-zinc-200/80 shadow-md ring-2 ring-zinc-100 sm:h-44 sm:w-44"
         />
+        <div className="flex max-w-[22rem] flex-col items-center gap-2 text-center">
+          <p className="text-[11px] font-bold tracking-[0.2em] text-zinc-500">LAOSHI XU</p>
+          <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-base font-semibold tracking-tight text-zinc-900">
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold tracking-[0.12em] text-emerald-900">
+              FREE
+            </span>
+            <span>Mandarin Flashcard</span>
+          </p>
+          <p className="text-[13px] leading-relaxed text-zinc-500">
+            Level Up from{" "}
+            <span className="font-semibold tabular-nums text-zinc-800">HSK 1</span>
+            {" to "}
+            <span className="font-semibold tabular-nums text-zinc-800">HSK 9</span>
+          </p>
+        </div>
       </div>
 
       {authError || localError ? (
@@ -23,8 +37,6 @@ export function AuthCard({ authError }: { authError?: string | null }) {
           {authError ?? localError}
         </div>
       ) : null}
-
-      <div className="mb-4 text-base font-semibold text-zinc-900">{title}</div>
 
       <form
         action={mode === "signin" ? signInWithEmail : signUpWithEmail}
