@@ -84,9 +84,12 @@ export function FlashcardGame({
   const guestVocabTierRef = useRef(0);
   const correctStreakRef = useRef(0);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** True only when `load()` runs right after the post-answer delay (next word transition). */
+  const isAdvancingRef = useRef(false);
   /** Next round fetched in the background while the answer is visible (1.4s). */
   const pendingNextRef = useRef<Promise<{ payload: ApiPayload; nextMode: QuestionMode }> | null>(null);
   const [idkRemaining, setIdkRemaining] = useState(IDK_DAILY_LIMIT);
+  const [showNextWordOverlay, setShowNextWordOverlay] = useState(false);
 
   const restoreRound = useCallback((): boolean => {
     if (typeof window === "undefined") return false;
@@ -157,6 +160,26 @@ export function FlashcardGame({
     persistRound();
   }, [persistRound]);
 
+  /** Stable identity: parent often passes `demo={{ fetchPath }}` which is a new object every render — do not depend on `demo` itself. */
+  const guestDemoFetchPath = demo?.fetchPath ?? null;
+
+  /** New tip each time the active word id changes (including first load). */
+  useEffect(() => {
+    if (!word) return;
+    const len = guestDemoFetchPath ? DEMO_AFTER_ANSWER_TIPS.length : AFTER_ANSWER_TIPS.length;
+    if (len <= 1) {
+      setAfterAnswerTipIndex(0);
+      return;
+    }
+    setAfterAnswerTipIndex((prev) => {
+      let next = prev;
+      for (let i = 0; i < 12 && next === prev; i++) {
+        next = Math.floor(Math.random() * len);
+      }
+      return next;
+    });
+  }, [guestDemoFetchPath, word?.id]);
+
   useEffect(() => {
     scoreRef.current = initialScore;
   }, [initialScore]);
@@ -168,6 +191,11 @@ export function FlashcardGame({
   }, []);
 
   const load = useCallback(async (loadOpts?: { resetMode?: boolean }) => {
+    const fromAdvance = isAdvancingRef.current;
+    if (fromAdvance) {
+      setShowNextWordOverlay(true);
+    }
+
     setReveal(null);
 
     const pending = pendingNextRef.current;
@@ -181,6 +209,10 @@ export function FlashcardGame({
         setOptions(buildOptions(payload.word, payload.distractors));
         setSource(payload.source === "demo" ? "demo" : payload.source);
         void syncIdkFromServer();
+        if (fromAdvance) {
+          setShowNextWordOverlay(false);
+          isAdvancingRef.current = false;
+        }
         return;
       } catch {
         /* prefetch failed — fetch below */
@@ -214,6 +246,10 @@ export function FlashcardGame({
       setMode(null);
     } finally {
       setBusy(false);
+      if (fromAdvance) {
+        setShowNextWordOverlay(false);
+        isAdvancingRef.current = false;
+      }
     }
     void syncIdkFromServer();
   }, [demo, mode, syncIdkFromServer]);
@@ -237,6 +273,7 @@ export function FlashcardGame({
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     advanceTimerRef.current = setTimeout(() => {
       advanceTimerRef.current = null;
+      isAdvancingRef.current = true;
       void load();
     }, 1400);
   }, [demo, load, mode]);
@@ -304,8 +341,6 @@ export function FlashcardGame({
       if (!word || !mode || busy || reveal) return;
       if (opt.kind !== "word") return;
       const pickedKey = `word:${opt.word.id}`;
-      const tipsLen = demo ? DEMO_AFTER_ANSWER_TIPS.length : AFTER_ANSWER_TIPS.length;
-      setAfterAnswerTipIndex(Math.floor(Math.random() * tipsLen));
       setReveal({ correctId: word.id, pickedKey });
 
       const isCorrect = opt.word.id === word.id;
@@ -404,7 +439,6 @@ export function FlashcardGame({
 
     setIdkRemaining(rem);
 
-    setAfterAnswerTipIndex(Math.floor(Math.random() * AFTER_ANSWER_TIPS.length));
     setReveal({ correctId: word.id, pickedKey: "dontKnow" });
     correctStreakRef.current = 0;
 
@@ -435,7 +469,7 @@ export function FlashcardGame({
     <div className="relative rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_60px_rgba(0,0,0,0.06)]">
       {trialLimitReached ? (
         <div
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-3xl bg-white/95 p-6 text-center backdrop-blur-sm"
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 rounded-3xl bg-white/95 p-6 text-center backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="guest-trial-title"
@@ -613,11 +647,33 @@ export function FlashcardGame({
           </div>
           </div>
 
-          {reveal && (
-            <div className="text-sm text-zinc-500">{tipsForFooter[afterAnswerTipIndex % tipsForFooter.length]}</div>
-          )}
+          <div className="text-sm text-zinc-500" aria-live="polite">
+            {tipsForFooter[afterAnswerTipIndex % tipsForFooter.length]}
+          </div>
         </motion.div>
       </AnimatePresence>
+
+      {showNextWordOverlay ? (
+        <div
+          className="pointer-events-auto absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 rounded-3xl bg-white/75 backdrop-blur-[3px]"
+          aria-live="polite"
+          aria-busy="true"
+          aria-label="Loading next word"
+        >
+          <motion.div
+            className="h-9 w-9 rounded-full border-2 border-[#1a5156] border-t-transparent"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 0.75, repeat: Infinity, ease: "linear" }}
+          />
+          <motion.p
+            className="text-base font-semibold tracking-tight text-zinc-800"
+            animate={{ opacity: [0.55, 1, 0.55] }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+          >
+            Next Word
+          </motion.p>
+        </div>
+      ) : null}
     </div>
   );
 }
