@@ -1,6 +1,7 @@
 "use server";
 
 import { assertNotSuperadminPlay } from "@/lib/assertNotSuperadminPlay";
+import type { QuestionMode } from "@/lib/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function ensureProfile() {
@@ -14,7 +15,7 @@ export async function ensureProfile() {
 
   const { data: existing, error: selectError } = await supabase
     .from("profiles")
-    .select("id,email,total_points")
+    .select("id,email,total_points,highest_points")
     .eq("id", user.id)
     .maybeSingle();
   // If schema isn't applied yet, avoid hard-crashing the app.
@@ -27,8 +28,8 @@ export async function ensureProfile() {
 
   const { data: inserted, error: insertError } = await supabase
     .from("profiles")
-    .insert({ id: user.id, email: user.email, total_points: 0 })
-    .select("id,email,total_points")
+    .insert({ id: user.id, email: user.email, total_points: 0, highest_points: 0 })
+    .select("id,email,total_points,highest_points")
     .single();
   if (insertError) {
     if ((insertError as { code?: string }).code === "PGRST205") return null;
@@ -37,10 +38,13 @@ export async function ensureProfile() {
   return inserted;
 }
 
-export async function incrementPoints(delta: number) {
+export async function incrementPoints(delta: number, questionMode: QuestionMode | null = null) {
   await assertNotSuperadminPlay();
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("increment_total_points", { delta });
+  const { data, error } = await supabase.rpc("increment_total_points", {
+    delta,
+    question_mode: questionMode,
+  });
   if (error) throw error;
   return data as number;
 }

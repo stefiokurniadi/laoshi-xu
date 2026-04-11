@@ -14,6 +14,7 @@
     "translate-hsk": "node scripts/translate-hsk-english.mjs"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",
     "@upstash/ratelimit": "^2.0.8",

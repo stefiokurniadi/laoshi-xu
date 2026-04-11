@@ -1,24 +1,28 @@
 "use client";
 
-import { ChevronDown, KeyRound, LogIn, LogOut, UserRound, X } from "lucide-react";
+import { ChevronDown, Home, KeyRound, LogIn, LogOut, UserRound, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { signOut } from "@/app/actions/auth";
 import { BrandLogo } from "@/components/BrandLogo";
+import { GeminiAdviseLauncher } from "@/components/GeminiAdviseLauncher";
 import { LeaderboardLauncher } from "@/components/LeaderboardLauncher";
 import { playerRatingLabel } from "@/lib/rating";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function Navbar({
   email,
+  highestPoints,
   score,
   scoreDelta,
   loginHref,
   leaderboardUserId,
 }: {
   email?: string | null;
+  /** Server peak score; combined with live `score` so the menu stays accurate during play. */
+  highestPoints?: number;
   score: number;
   scoreDelta: number | null;
   /** When set and the user is not signed in, show a Log in control (e.g. on the public homepage). */
@@ -33,8 +37,15 @@ export function Navbar({
     return `${scoreDelta}`;
   }, [scoreDelta]);
 
-  const ratingLabel = useMemo(() => playerRatingLabel(score), [score]);
-  const ratingShort = useMemo(() => ratingLabel.replace(/^Rating:\s*/i, ""), [ratingLabel]);
+  const ratingShort = useMemo(
+    () => playerRatingLabel(score).replace(/^Rating:\s*/i, ""),
+    [score],
+  );
+  const peakPoints = email ? Math.max(highestPoints ?? score, score) : score;
+  const peakRatingShort = useMemo(
+    () => playerRatingLabel(peakPoints).replace(/^Rating:\s*/i, ""),
+    [peakPoints],
+  );
   const pointLabel = email ? "Point:" : "Guest Point:";
 
   const [accountOpen, setAccountOpen] = useState(false);
@@ -154,41 +165,27 @@ export function Navbar({
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
         <Link
           href="/"
+          aria-label="Home"
           className="flex min-w-0 shrink items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
         >
-          <BrandLogo className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 sm:h-11 sm:w-11" />
+          <BrandLogo className="hidden h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 sm:block sm:h-11 sm:w-11" />
+          <Home className="h-7 w-7 shrink-0 text-zinc-800 sm:hidden" strokeWidth={2} aria-hidden />
           <span className="hidden truncate text-[19px] font-bold tracking-[0.2em] text-zinc-900 sm:inline">
             LAOSHI XU
           </span>
-          {email ? (
-            <span className="min-w-0 sm:hidden">
-              <span
-                className="block max-w-[min(48vw,12rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
-                title="User Rating"
-              >
-                User Rating:
-              </span>
-              <span
-                className="mt-0.5 block max-w-[min(48vw,12rem)] truncate text-[12px] font-semibold text-zinc-800"
-                title={ratingShort}
-              >
-                {ratingShort}
-              </span>
-            </span>
-          ) : null}
         </Link>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
           {email ? (
-            <div className="hidden min-w-0 shrink flex-col items-end text-right sm:flex">
+            <div className="flex min-w-0 shrink flex-col items-end text-right">
               <span
-                className="block max-w-[min(46vw,12rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
+                className="block max-w-[min(42vw,9rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:max-w-[min(46vw,12rem)]"
                 title="User Rating"
               >
                 User Rating:
               </span>
               <span
-                className="mt-0.5 block max-w-[min(46vw,12rem)] truncate text-[12px] font-semibold text-zinc-800"
+                className="mt-0.5 block max-w-[min(42vw,9rem)] truncate text-[12px] font-semibold text-zinc-800 sm:max-w-[min(46vw,12rem)]"
                 title={ratingShort}
               >
                 {ratingShort}
@@ -196,20 +193,14 @@ export function Navbar({
             </div>
           ) : null}
 
-          {email && leaderboardUserId ? (
-            <div className="sm:hidden">
-              <LeaderboardLauncher userId={leaderboardUserId} variant="icon" />
-            </div>
-          ) : null}
-
-          <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 bg-[#1a5156] px-2.5 text-sm font-medium text-white shadow-sm sm:gap-2 sm:px-4">
-            <span className="text-white/100">{pointLabel}</span>
+          <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-2.5 text-sm font-medium text-zinc-700 shadow-sm sm:gap-2 sm:px-4">
+            <span className="font-semibold text-zinc-600">{pointLabel}</span>
             <motion.span
               key={score}
               initial={{ scale: 1 }}
               animate={{ scale: [1, 1.15, 1] }}
               transition={{ duration: 0.35 }}
-              className="font-semibold tabular-nums text-white"
+              className="font-semibold tabular-nums text-[#1a5156]"
             >
               {score}
             </motion.span>
@@ -228,18 +219,30 @@ export function Navbar({
             </AnimatePresence>
           </div>
 
+          {email && leaderboardUserId ? (
+            <div className="sm:hidden">
+              <LeaderboardLauncher userId={leaderboardUserId} variant="icon" />
+            </div>
+          ) : null}
+
+          {email ? (
+            <GeminiAdviseLauncher />
+          ) : loginHref ? (
+            <GeminiAdviseLauncher guestMode signInHref={loginHref} />
+          ) : null}
+
           {email ? (
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
                 onClick={() => setAccountOpen((v) => !v)}
-                className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] sm:aspect-auto sm:h-10 sm:max-h-none sm:max-w-none sm:min-h-10 sm:min-w-0 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
+                className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] sm:aspect-auto sm:h-10 sm:max-h-none sm:max-w-none sm:min-h-10 sm:min-w-0 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-semibold"
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
                 aria-label="My profile"
               >
                 <UserRound className="h-[1.125rem] w-[1.125rem] shrink-0 sm:hidden" strokeWidth={2} aria-hidden />
-                <span className="hidden sm:inline">My profile</span>
+                <span className="hidden font-semibold sm:inline">My profile</span>
                 <ChevronDown className="hidden h-4 w-4 shrink-0 text-white/75 sm:block" aria-hidden />
               </button>
 
@@ -259,6 +262,20 @@ export function Navbar({
                         title={email ?? ""}
                       >
                         {email}
+                      </div>
+                      <div className="mt-2 border-t border-zinc-100 pt-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                          Highest ever rating
+                        </div>
+                        <div
+                          className="mt-0.5 truncate text-xs font-medium text-zinc-800"
+                          title={peakRatingShort}
+                        >
+                          {peakRatingShort}
+                        </div>
+                        <div className="mt-0.5 text-[10px] tabular-nums text-zinc-500">
+                          Peak score: {peakPoints}
+                        </div>
                       </div>
                     </div>
 
@@ -296,7 +313,7 @@ export function Navbar({
               className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] sm:aspect-auto sm:h-10 sm:max-h-none sm:max-w-none sm:min-h-10 sm:min-w-0 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
             >
               <LogIn className="h-[1.125rem] w-[1.125rem] shrink-0 sm:hidden" strokeWidth={2} aria-hidden />
-              <span className="hidden sm:inline">Login for Free</span>
+              <span className="hidden sm:inline font-semibold">Login for Free</span>
             </Link>
           ) : null}
         </div>

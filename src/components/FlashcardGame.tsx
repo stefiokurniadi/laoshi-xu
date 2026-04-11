@@ -13,7 +13,7 @@ import {
 } from "@/lib/game";
 import { fetchIdkRemaining, consumeIdkQuota } from "@/app/actions/idkQuota";
 import { incrementPoints } from "@/app/actions/profile";
-import { removeFailedWord, upsertFailedWord } from "@/app/actions/review";
+import { upsertFailedWord } from "@/app/actions/review";
 import {
   consumeIdkIfAllowedLocal,
   getIdkRemainingLocal,
@@ -41,7 +41,7 @@ type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "revi
 
 const AFTER_ANSWER_TIPS = [
   "Tip: Consecutive correct answers get more points",
-  "Tip: I don't know quota refill after midnight",
+  "Tip: “New word to me” quota refills after midnight",
   "Tip: Review list will change colour if you make the same mistakes",
   "Tip: If you got HSK 1 wrong, -9 points!",
 ] as const;
@@ -513,26 +513,15 @@ export function FlashcardGame({
         } catch {
           // Ignore review failures (e.g. auth issues) without blocking gameplay.
         }
-      } else if (source === "review") {
-        try {
-          await removeFailedWord(word.id);
-          onReviewChange?.();
-        } catch {
-          // Ignore if review table isn't ready.
-        }
       }
 
-      if (delta !== 0) {
-        try {
-          const nextTotal = await incrementPoints(delta);
-          onScoreChange(nextTotal, delta);
-        } catch {
-          const next = scoreRef.current + delta;
-          scoreRef.current = next;
-          onScoreChange(next, delta);
-        }
-      } else {
-        onScoreChange(scoreRef.current, 0);
+      try {
+        const nextTotal = await incrementPoints(delta, mode);
+        onScoreChange(nextTotal, delta);
+      } catch {
+        const next = scoreRef.current + delta;
+        scoreRef.current = next;
+        onScoreChange(next, delta);
       }
 
       startPrefetchAndScheduleAdvance();
@@ -545,7 +534,6 @@ export function FlashcardGame({
       onScoreChange,
       pinyinAutoplayOn,
       reveal,
-      source,
       speakCorrectAnswerHanzi,
       speechOk,
       startPrefetchAndScheduleAdvance,
@@ -764,36 +752,51 @@ export function FlashcardGame({
               );
               })}
 
-            {!demo ? (
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.18,
-                  ease: [0.22, 1, 0.36, 1],
-                  delay: wordOptionsShown.length * 0.03,
-                }}
-                disabled={busy || Boolean(reveal) || idkExhausted}
-                onClick={() => void pickDontKnow()}
-                className={`w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed sm:col-span-2 ${
-                  reveal?.pickedKey === "dontKnow"
-                    ? "z-[1] !bg-amber-200 !text-amber-950"
+            <motion.button
+              type="button"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.18,
+                ease: [0.22, 1, 0.36, 1],
+                delay: wordOptionsShown.length * 0.03,
+              }}
+              disabled={busy || Boolean(reveal) || (demo ? true : idkExhausted)}
+              title={
+                demo
+                  ? "Sign in (free) to use “New word to me” — this feature is for signed-in learners."
+                  : undefined
+              }
+              onClick={() => {
+                if (demo) return;
+                void pickDontKnow();
+              }}
+              className={`w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors sm:col-span-2 ${
+                demo
+                  ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-500"
+                  : reveal?.pickedKey === "dontKnow"
+                    ? "z-[1] !bg-amber-200 !text-amber-950 disabled:cursor-default disabled:opacity-100"
                     : idkExhausted
-                      ? "border-zinc-200 bg-zinc-100 text-zinc-400"
-                      : "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100"
-                }`}
-              >
-                {idkExhausted ? (
-                  "Wait until tomorrow"
-                ) : (
-                  <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
-                    <span>I don’t know</span>
-                    <span className="font-medium text-zinc-500">({idkRemaining} Remaining)</span>
+                      ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
+                      : "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:cursor-not-allowed"
+              }`}
+            >
+              {demo ? (
+                <span className="inline-flex flex-col items-center gap-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-2">
+                  <span>New word to me</span>
+                  <span className="text-xs font-normal text-zinc-500">
+                    Sign in to use — for members only
                   </span>
-                )}
-              </motion.button>
-            ) : null}
+                </span>
+              ) : idkExhausted ? (
+                "Wait until tomorrow"
+              ) : (
+                <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
+                  <span>New word to me</span>
+                  <span className="font-medium text-zinc-500">({idkRemaining} remaining)</span>
+                </span>
+              )}
+            </motion.button>
           </div>
           </div>
 
@@ -805,7 +808,8 @@ export function FlashcardGame({
               <button
                 type="button"
                 onClick={togglePinyinAutoplay}
-                className="inline-flex h-8 w-[8.75rem] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 text-sm font-normal text-zinc-500 shadow-sm transition-colors hover:bg-zinc-50"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 shadow-sm transition-colors hover:bg-zinc-50 sm:h-8 sm:w-[8.75rem] sm:gap-1.5 sm:px-2 sm:text-sm sm:font-normal"
+                aria-label={pinyinAutoplayOn ? "Sound on — tap to mute" : "Muted — tap for sound"}
                 title={
                   pinyinAutoplayOn
                     ? "Sound on: pinyin prompts auto-play Mandarin; other modes play the correct word after you answer."
@@ -818,12 +822,12 @@ export function FlashcardGame({
                       className={`h-4 w-4 shrink-0 text-zinc-500 ${ttsPlaying ? "animate-pulse" : ""}`}
                       aria-hidden
                     />
-                    Sound on
+                    <span className="hidden sm:inline">Sound on</span>
                   </>
                 ) : (
                   <>
                     <VolumeX className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-                    Mute
+                    <span className="hidden sm:inline">Mute</span>
                   </>
                 )}
               </button>

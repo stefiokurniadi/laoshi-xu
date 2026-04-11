@@ -1,7 +1,7 @@
 /** Must match exclusion in `get_leaderboard_snapshot` (supabase/schema.sql). */
-export const DEFAULT_SUPERADMIN_EMAIL = "superadmin@laoshixu.com";
+const DEFAULT_SUPERADMIN_EMAIL = "superadmin@laoshixu.com";
 
-export function superadminEmailFromEnv(): string {
+function superadminEmailFromEnv(): string {
   const v = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
   return v || DEFAULT_SUPERADMIN_EMAIL.toLowerCase();
 }

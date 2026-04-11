@@ -65,5 +65,12 @@ async function Main() {
       </div>
     );
   }
-  return <FlashcardShell email={profile?.email ?? user.email} initialScore={profile?.total_points ?? 0} userId={user.id} />;
+  return (
+    <FlashcardShell
+      email={profile?.email ?? user.email}
+      highestPoints={Math.max(profile?.highest_points ?? 0, profile?.total_points ?? 0)}
+      initialScore={profile?.total_points ?? 0}
+      userId={user.id}
+    />
+  );
 }

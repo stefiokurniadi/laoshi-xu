@@ -181,11 +181,6 @@ export async function pickRandomGuestDemoWord(poolIds: number[]): Promise<HskWor
   );
 }
 
-/** @param vocabTier 0 = full demo table; each +1 halves the slice (by sort order), down to a small floor. */
-export async function getRandomDemoWord(vocabTier = 0): Promise<HskWord> {
-  return pickRandomGuestDemoWord(await getGuestDemoPoolWordIds(vocabTier));
-}
-
 /** Distractors prefer words in the demo pool at the same HSK level; fill from full level pool if needed. */
 export async function getDemoDistractors(
   word: HskWord,

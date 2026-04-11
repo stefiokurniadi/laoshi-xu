@@ -1,4 +1,4 @@
-/** Max "I don't know" uses per calendar day (must match DB cap in `consume_idk_quota`). */
+/** Max “New word to me” uses per calendar day (must match DB cap in `consume_idk_quota`). */
 export const IDK_DAILY_LIMIT = 3;
 
 const STORAGE_PREFIX = "laoshi-xu:idk-quota:";

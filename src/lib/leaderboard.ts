@@ -3,6 +3,8 @@ export type LeaderboardPlayerRow = {
   profileId: string;
   displayEmail: string;
   totalPoints: number;
+  /** Peak score; falls back to current when missing (older API). */
+  highestPoints: number;
   isViewer: boolean;
 };
 
@@ -17,8 +19,4 @@ export type LeaderboardSnapshot = {
 
 export function isGapRow(row: LeaderboardRow): row is LeaderboardGapRow {
   return typeof row === "object" && row !== null && "type" in row && row.type === "gap";
-}
-
-export function isPlayerRow(row: LeaderboardRow): row is LeaderboardPlayerRow {
-  return !isGapRow(row);
 }

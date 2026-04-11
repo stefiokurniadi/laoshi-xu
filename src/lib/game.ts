@@ -1,6 +1,6 @@
 import type { HskWord, Option, QuestionMode } from "@/lib/types";
 
-export const QUESTION_MODES: QuestionMode[] = ["EN_TO_ZH", "HZ_TO_EN", "PY_TO_MIX"];
+const QUESTION_MODES: QuestionMode[] = ["EN_TO_ZH", "HZ_TO_EN", "PY_TO_MIX"];
 
 export function parseQuestionMode(s: string | null): QuestionMode | null {
   if (!s) return null;
@@ -8,7 +8,7 @@ export function parseQuestionMode(s: string | null): QuestionMode | null {
 }
 
 /** Extra points on top of base level score: 2nd consecutive correct +1, 3rd +2, 4th +3, … */
-export function consecutiveCorrectBonus(newStreak: number): number {
+function consecutiveCorrectBonus(newStreak: number): number {
   return Math.max(0, newStreak - 1);
 }
 
@@ -65,7 +65,7 @@ export function shuffle<T>(arr: T[]): T[] {
 }
 
 /** Total multiple-choice answers (one correct + distractors). */
-export const ANSWER_CHOICE_COUNT = 4;
+const ANSWER_CHOICE_COUNT = 4;
 
 export function buildOptions(correct: HskWord, distractors: HskWord[]): Option[] {
   const maxDistractors = ANSWER_CHOICE_COUNT - 1;

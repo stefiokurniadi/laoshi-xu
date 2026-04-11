@@ -29,6 +29,47 @@ with check (auth.uid() = id);
 alter table public.profiles
   add column if not exists first_played_at timestamptz;
 
+-- Peak score (for leaderboard “high” column and profile “best rating”).
+alter table public.profiles
+  add column if not exists highest_points integer not null default 0;
+
+update public.profiles
+set highest_points = greatest(coalesce(highest_points, 0), total_points);
+
+-- Study stats (Gemini advice context + 100-answer milestones) and cached advice text
+alter table public.profiles
+  add column if not exists total_scored_answers integer not null default 0;
+alter table public.profiles
+  add column if not exists answers_en_to_zh integer not null default 0;
+alter table public.profiles
+  add column if not exists answers_hz_to_en integer not null default 0;
+alter table public.profiles
+  add column if not exists answers_py_to_mix integer not null default 0;
+alter table public.profiles
+  add column if not exists last_advice_text text;
+alter table public.profiles
+  add column if not exists last_advice_at timestamptz;
+
+-- 1b) Gemini API usage log (inserts from Next.js service role; users can read own rows for UI)
+create table if not exists public.gemini_usage (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  prompt_tokens integer not null default 0,
+  candidates_tokens integer not null default 0,
+  total_tokens integer not null default 0,
+  answers_at_generation integer not null
+);
+
+create index if not exists gemini_usage_user_created_idx on public.gemini_usage (user_id, created_at desc);
+
+alter table public.gemini_usage enable row level security;
+
+create policy "gemini_usage_select_own"
+on public.gemini_usage
+for select
+using (auth.uid() = user_id);
+
 -- 2) HSK words
 create table if not exists public.hsk_words (
   id bigint generated always as identity primary key,
@@ -222,8 +263,10 @@ where p.first_played_at is null
     or exists (select 1 from public.idk_daily_uses i where i.user_id = p.id and i.uses > 0)
   );
 
--- 4) Atomic point increments (avoid races)
-create or replace function public.increment_total_points(delta integer)
+-- 4) Atomic point increments + optional per-answer study stats (question_mode null = points only)
+drop function if exists public.increment_total_points(integer);
+
+create or replace function public.increment_total_points(delta integer, question_mode text default null)
 returns integer
 language plpgsql
 security definer
@@ -232,12 +275,55 @@ as $$
 declare
   new_total integer;
 begin
-  update public.profiles
+  if question_mode is not null and question_mode not in ('EN_TO_ZH', 'HZ_TO_EN', 'PY_TO_MIX') then
+    raise exception 'invalid question_mode %', question_mode;
+  end if;
+
+  with curr as (
+    select
+      p.total_points,
+      coalesce(p.highest_points, 0) as peak,
+      coalesce(p.total_scored_answers, 0) as sc,
+      coalesce(p.answers_en_to_zh, 0) as a_en,
+      coalesce(p.answers_hz_to_en, 0) as a_hz,
+      coalesce(p.answers_py_to_mix, 0) as a_py
+    from public.profiles p
+    where p.id = auth.uid()
+  ),
+  next_vals as (
+    select
+      case when delta = 0 then c.total_points else c.total_points + delta end as new_total,
+      case
+        when delta = 0 then c.peak
+        else greatest(c.peak, c.total_points + delta)
+      end as new_peak,
+      case when question_mode is null then c.sc else c.sc + 1 end as new_sc,
+      case
+        when question_mode is null then c.a_en
+        else c.a_en + (case when question_mode = 'EN_TO_ZH' then 1 else 0 end)
+      end as na_en,
+      case
+        when question_mode is null then c.a_hz
+        else c.a_hz + (case when question_mode = 'HZ_TO_EN' then 1 else 0 end)
+      end as na_hz,
+      case
+        when question_mode is null then c.a_py
+        else c.a_py + (case when question_mode = 'PY_TO_MIX' then 1 else 0 end)
+      end as na_py
+    from curr c
+  )
+  update public.profiles p
   set
-    total_points = total_points + delta,
-    first_played_at = coalesce(first_played_at, now())
-  where id = auth.uid()
-  returning total_points into new_total;
+    total_points = n.new_total,
+    highest_points = n.new_peak,
+    first_played_at = coalesce(p.first_played_at, now()),
+    total_scored_answers = n.new_sc,
+    answers_en_to_zh = n.na_en,
+    answers_hz_to_en = n.na_hz,
+    answers_py_to_mix = n.na_py
+  from next_vals n
+  where p.id = auth.uid()
+  returning p.total_points into new_total;
 
   if new_total is null then
     raise exception 'profile not found for user %', auth.uid();
@@ -247,8 +333,8 @@ begin
 end;
 $$;
 
-revoke all on function public.increment_total_points(integer) from public;
-grant execute on function public.increment_total_points(integer) to authenticated;
+revoke all on function public.increment_total_points(integer, text) from public;
+grant execute on function public.increment_total_points(integer, text) to authenticated;
 
 -- Leaderboard: top 20 by points; emails masked in RPC (first 3 chars + ***), except the caller’s own row.
 -- Excludes superadmin@laoshixu.com (must match SUPERADMIN_EMAIL / src/lib/superadmin.ts).
@@ -267,6 +353,7 @@ declare
   v_rank bigint;
   v_points int;
   v_email text;
+  v_highest int;
   gap_hidden int;
 begin
   if viewer is null then
@@ -286,6 +373,7 @@ begin
         p.id,
         p.email,
         p.total_points,
+        coalesce(p.highest_points, p.total_points) as high_pts,
         row_number() over (order by p.total_points desc, p.id asc) as rnk
       from public.profiles p
       where coalesce(lower(trim(p.email)), '') <> 'superadmin@laoshixu.com'
@@ -307,6 +395,7 @@ begin
                   else left(coalesce(t.email, ''), 3) || '***'
                 end,
               'totalPoints', t.total_points,
+              'highestPoints', t.high_pts,
               'isViewer', t.id = viewer
             )
             order by t.rnk
@@ -322,13 +411,14 @@ begin
     return jsonb_build_object('rows', top_rows, 'showGap', false);
   end if;
 
-  select r.rnk, r.total_points, r.email
-  into v_rank, v_points, v_email
+  select r.rnk, r.total_points, r.email, coalesce(r.highest_points, r.total_points)
+  into v_rank, v_points, v_email, v_highest
   from (
     select
       p.id,
       p.email,
       p.total_points,
+      p.highest_points,
       row_number() over (order by p.total_points desc, p.id asc) as rnk
     from public.profiles p
     where coalesce(lower(trim(p.email)), '') <> 'superadmin@laoshixu.com'
@@ -354,6 +444,7 @@ begin
              'profileId', viewer::text,
              'displayEmail', coalesce(v_email, ''),
              'totalPoints', v_points,
+             'highestPoints', v_highest,
              'isViewer', true
            )
          ),

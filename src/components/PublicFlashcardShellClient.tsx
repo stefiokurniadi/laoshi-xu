@@ -33,7 +33,7 @@ export function PublicFlashcardShellClient({ ttsVoicePreset }: { ttsVoicePreset:
       <div className="relative z-0 mx-auto flex w-full max-w-6xl flex-1 flex-col items-center px-5 py-8">
         <div className="mb-6 w-full text-center sm:mb-8">
           <div className="text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
-            MISSION: Gain more points & Level up
+            FREE Mandarin Flashcard: Gain Points & Increase Your HSK Level
           </div>
         </div>
 

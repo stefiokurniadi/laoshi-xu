@@ -1,7 +1,7 @@
 import { pickVoiceForPreset, type TtsVoicePreset } from "@/lib/ttsVoice";
 
 /** localStorage: pinyin TTS autoplay (shared guest + logged-in, same browser). */
-export const PINYIN_TTS_AUTOPLAY_KEY = "laoshi-xu:pinyin-tts-autoplay";
+const PINYIN_TTS_AUTOPLAY_KEY = "laoshi-xu:pinyin-tts-autoplay";
 
 export function readPinyinAutoplayPreference(): boolean {
   if (typeof window === "undefined") return false;
@@ -24,8 +24,6 @@ export function writePinyinAutoplayPreference(on: boolean): void {
 export function pinyinSpeechSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
-
-export type { TtsVoicePreset };
 
 export function speakHanzi(
   hanzi: string,

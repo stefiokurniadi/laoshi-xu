@@ -5,11 +5,11 @@
 
 import { HONEYPOT_FIELD } from "@/lib/honeypotConstants";
 
-export function honeypotFilled(formData: FormData): boolean {
+function honeypotFilled(formData: FormData): boolean {
   return String(formData.get(HONEYPOT_FIELD) ?? "").trim().length > 0;
 }
 
-export async function verifyTurnstileFromForm(formData: FormData): Promise<boolean> {
+async function verifyTurnstileFromForm(formData: FormData): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
   if (!secret) return true;
 
@@ -33,7 +33,7 @@ export async function verifyTurnstileFromForm(formData: FormData): Promise<boole
   }
 }
 
-export type LoginAntiSpamResult = { ok: true } | { ok: false; reason: "honeypot" | "turnstile" };
+type LoginAntiSpamResult = { ok: true } | { ok: false; reason: "honeypot" | "turnstile" };
 
 /** Honeypot always; Turnstile when `TURNSTILE_SECRET_KEY` is set (pass `turnstile: true` for sign-in / sign-up). */
 export async function checkLoginAntiSpam(

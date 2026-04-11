@@ -81,21 +81,3 @@ export async function getFailedWords() {
     .filter((x) => Boolean(x.word));
 }
 
-export async function removeFailedWord(wordId: number) {
-  await assertNotSuperadminPlay();
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!user) throw new Error("Not authenticated");
-
-  const { error } = await supabase
-    .from("failed_words")
-    .delete()
-    .eq("user_id", user.id)
-    .eq("word_id", wordId);
-  if (error) throw error;
-}
-

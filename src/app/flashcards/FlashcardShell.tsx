@@ -4,10 +4,12 @@ import { getTtsVoicePreset } from "@/lib/appSettings.server";
 
 export async function FlashcardShell({
   email,
+  highestPoints,
   initialScore,
   userId,
 }: {
   email?: string | null;
+  highestPoints: number;
   initialScore: number;
   userId: string;
 }) {
@@ -15,6 +17,7 @@ export async function FlashcardShell({
   return (
     <FlashcardShellClient
       email={email}
+      highestPoints={highestPoints}
       initialScore={initialScore}
       initialReviewRows={initialRows.map((r) => ({
         last_seen: r.last_seen,
