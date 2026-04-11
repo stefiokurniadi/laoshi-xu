@@ -1,6 +1,7 @@
 import { ensureProfile } from "@/app/actions/profile";
 import { FlashcardShell } from "@/app/flashcards/FlashcardShell";
 import { PublicFlashcardShellClient } from "@/components/PublicFlashcardShellClient";
+import { getTtsVoicePreset } from "@/lib/appSettings.server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { redirect } from "next/navigation";
@@ -40,7 +41,8 @@ async function Main() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return <PublicFlashcardShellClient />;
+    const ttsVoicePreset = await getTtsVoicePreset();
+    return <PublicFlashcardShellClient ttsVoicePreset={ttsVoicePreset} />;
   }
 
   if (isSuperadminEmail(user.email)) {

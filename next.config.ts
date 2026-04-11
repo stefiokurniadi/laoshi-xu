@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  /** Browsers request `/favicon.ico` by default; serve the real logo so the Vercel placeholder isn’t used. */
+  async rewrites() {
+    return [{ source: "/favicon.ico", destination: "/laoshi-xu-logo.png" }];
+  },
 };
 
 export default nextConfig;

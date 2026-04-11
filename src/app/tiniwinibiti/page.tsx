@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isTiniwinibitiUnlocked, unlockTiniwinibitiGate } from "@/app/actions/tiniwinibiti";
 import { GoogleLoginToggle } from "@/components/GoogleLoginToggle";
-import { getGoogleLoginEnabled } from "@/lib/appSettings.server";
+import { TtsVoicePresetForm } from "@/components/TtsVoicePresetForm";
+import { getGoogleLoginEnabled, getTtsVoicePreset } from "@/lib/appSettings.server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default async function TiniwinibitiPage(props: PageProps) {
 
   const unlocked = await isTiniwinibitiUnlocked();
   const googleOn = await getGoogleLoginEnabled();
+  const ttsPreset = await getTtsVoicePreset();
   const errorRaw = typeof searchParams.error === "string" ? searchParams.error : null;
   const saved = searchParams.saved === "1";
 
@@ -76,8 +78,9 @@ export default async function TiniwinibitiPage(props: PageProps) {
             </button>
           </form>
         ) : (
-          <div className="mt-6">
+          <div className="mt-6 space-y-2">
             <GoogleLoginToggle enabled={googleOn} />
+            <TtsVoicePresetForm current={ttsPreset} />
           </div>
         )}
       </div>

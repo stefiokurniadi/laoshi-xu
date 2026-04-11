@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { parseTtsVoicePreset, type TtsVoicePreset } from "@/lib/ttsVoice";
 
 const UNLOCK_COOKIE = "tiniwinibiti_unlock";
 const UNLOCK_MAX_AGE = 60 * 60 * 8;
@@ -82,6 +83,45 @@ export async function enableGoogleLoginAction() {
 
 export async function disableGoogleLoginAction() {
   await setGoogleLoginEnabled(false);
+}
+
+async function setTtsVoicePreset(preset: TtsVoicePreset) {
+  const user = await requireLoggedIn();
+  if (!user) {
+    redirect("/login?authError=" + encodeURIComponent("Sign in to continue."));
+  }
+  if (!(await requireUnlockCookie())) {
+    redirect("/tiniwinibiti?error=locked");
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    redirect(
+      "/tiniwinibiti?error=" +
+        encodeURIComponent("Set SUPABASE_SERVICE_ROLE_KEY on the server to change this setting."),
+    );
+  }
+
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { error } = await admin
+    .from("app_settings")
+    .update({ tts_voice_preset: preset, updated_at: new Date().toISOString() })
+    .eq("id", 1);
+  if (error) {
+    redirect("/tiniwinibiti?error=" + encodeURIComponent(error.message));
+  }
+  revalidatePath("/");
+  revalidatePath("/tiniwinibiti");
+  redirect("/tiniwinibiti?saved=1");
+}
+
+export async function setTtsVoicePresetAction(formData: FormData) {
+  const raw = String(formData.get("ttsVoicePreset") ?? "").trim();
+  if (raw !== "auto" && raw !== "female" && raw !== "male") {
+    redirect("/tiniwinibiti?error=" + encodeURIComponent("Invalid voice preset."));
+  }
+  await setTtsVoicePreset(parseTtsVoicePreset(raw));
 }
 
 export async function isTiniwinibitiUnlocked(): Promise<boolean> {

@@ -1,5 +1,6 @@
 import { getFailedWords } from "@/app/actions/review";
 import { FlashcardShellClient } from "@/components/FlashcardShellClient";
+import { getTtsVoicePreset } from "@/lib/appSettings.server";
 
 export async function FlashcardShell({
   email,
@@ -10,7 +11,7 @@ export async function FlashcardShell({
   initialScore: number;
   userId: string;
 }) {
-  const initialRows = await getFailedWords();
+  const [initialRows, ttsVoicePreset] = await Promise.all([getFailedWords(), getTtsVoicePreset()]);
   return (
     <FlashcardShellClient
       email={email}
@@ -20,6 +21,7 @@ export async function FlashcardShell({
         times_seen: r.times_seen ?? 1,
         word: r.word,
       }))}
+      ttsVoicePreset={ttsVoicePreset}
       userId={userId}
     />
   );

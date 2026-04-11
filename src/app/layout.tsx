@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 const siteUrl = getSiteUrl();
-const siteTitle = "Laoshi Xu — Mandarin HSK flashcards & daily practice";
+const siteTitle = "FREE Mandarin HSK Flashcards";
 const siteDescription =
   "Practice Chinese vocabulary with HSK-level flashcards, multiple-choice modes, a leaderboard, and a personal review list for words you miss.";
 
@@ -58,6 +58,11 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true },
   },
   alternates: { canonical: siteUrl },
+  // Favicons: use `app/icon.png` + `app/apple-icon.png` (Laoshi Xu logo) so the tab icon isn’t the Vercel default.
+  icons: {
+    icon: [{ url: "/laoshi-xu-logo.png", type: "image/png", sizes: "250x250" }],
+    apple: [{ url: "/laoshi-xu-logo.png", type: "image/png", sizes: "250x250" }],
+  },
 };
 
 export const viewport: Viewport = {

@@ -45,7 +45,14 @@ function HoneypotField() {
       type="text"
       name={HONEYPOT_FIELD}
       tabIndex={-1}
+      readOnly
       autoComplete="off"
+      data-1p-ignore
+      data-lpignore="true"
+      data-bwignore
+      onChange={() => {
+        /* readonly — ignore autofill mutations */
+      }}
       className="pointer-events-none absolute left-0 top-0 h-px w-px overflow-hidden opacity-0"
       aria-hidden
       defaultValue=""

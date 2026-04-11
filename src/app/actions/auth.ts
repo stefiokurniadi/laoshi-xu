@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { mapSignInPasswordError, mapSignUpError } from "@/lib/authErrors";
 import { checkLoginAntiSpam } from "@/lib/antiSpam";
 import { allowAuthRateLimit } from "@/lib/rateLimit";
 import { getRequestIpFromHeaders } from "@/lib/requestIp";
@@ -14,11 +15,18 @@ async function guardAntiSpamAndRateLimit(
   const spam = await checkLoginAntiSpam(formData, { turnstile: opts.turnstile });
   if (!spam.ok) {
     if (spam.reason === "honeypot") {
-      redirect("/login?authError=" + encodeURIComponent("Something went wrong. Please try again."));
+      redirect(
+        "/login?authError=" +
+          encodeURIComponent(
+            "Sign-in was blocked by our anti-spam check (a hidden field was filled—often caused by a browser extension or password manager). Refresh the page and try again, or use Continue with Google.",
+          ),
+      );
     }
     redirect(
       "/login?authError=" +
-        encodeURIComponent("Security check failed. Refresh the page and try again."),
+        encodeURIComponent(
+          "Security verification didn’t pass (Cloudflare Turnstile). Wait until the challenge shows a checkmark, then try again. If it never appears, refresh the page or try another network/browser.",
+        ),
     );
   }
   const ip = await getRequestIpFromHeaders();
@@ -56,7 +64,7 @@ export async function signUpWithEmail(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/login?authError=${encodeURIComponent(error.message)}`);
+    redirect(`/login?authError=${encodeURIComponent(mapSignUpError(error))}`);
   }
 
   // Confirmations disabled: session is created immediately.
@@ -90,13 +98,13 @@ export async function signInWithEmail(formData: FormData) {
 
     if (unconfirmed) {
       const q = new URLSearchParams({
-        authError: error.message,
+        authError: mapSignInPasswordError(error),
         resendEmail: email,
       });
       redirect(`/login?${q.toString()}`);
     }
 
-    redirect(`/login?authError=${encodeURIComponent(error.message)}`);
+    redirect(`/login?authError=${encodeURIComponent(mapSignInPasswordError(error))}`);
   }
 
   redirect("/");

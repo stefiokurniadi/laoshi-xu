@@ -6,16 +6,19 @@ import { Navbar } from "@/components/Navbar";
 import { FlashcardGame } from "@/components/FlashcardGame";
 import { LeaderboardLauncher } from "@/components/LeaderboardLauncher";
 import { ReviewList } from "@/components/ReviewList";
+import type { TtsVoicePreset } from "@/lib/ttsVoice";
 
 export function FlashcardShellClient({
   email,
   initialScore,
   initialReviewRows,
+  ttsVoicePreset,
   userId,
 }: {
   email?: string | null;
   initialScore: number;
   initialReviewRows: ReviewListRow[];
+  ttsVoicePreset: TtsVoicePreset;
   userId: string;
 }) {
   const [score, setScore] = useState(initialScore);
@@ -49,6 +52,7 @@ export function FlashcardShellClient({
           <FlashcardGame
             userId={userId}
             initialScore={score}
+            ttsVoicePreset={ttsVoicePreset}
             onScoreChange={(nextScore, d) => {
               setScore(nextScore);
               setDelta(d);

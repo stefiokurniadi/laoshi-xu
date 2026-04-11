@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { Trophy, X } from "lucide-react";
 import { getLeaderboardSnapshot } from "@/app/actions/leaderboard";
 import { isGapRow, type LeaderboardRow } from "@/lib/leaderboard";
@@ -15,7 +16,12 @@ export function LeaderboardLauncher({
   variant?: "default" | "icon";
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const dialogTitleId = useId();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const buttonClassName =
     variant === "icon"
@@ -33,13 +39,16 @@ export function LeaderboardLauncher({
         <Trophy className="h-4 w-4 shrink-0 text-amber-300" aria-hidden />
         {variant === "default" ? "Leaderboard" : null}
       </button>
-      {open ? (
-        <LeaderboardModal
-          userId={userId}
-          titleId={dialogTitleId}
-          onClose={() => setOpen(false)}
-        />
-      ) : null}
+      {open && mounted
+        ? createPortal(
+            <LeaderboardModal
+              userId={userId}
+              titleId={dialogTitleId}
+              onClose={() => setOpen(false)}
+            />,
+            document.body,
+          )
+        : null}
     </>
   );
 }
@@ -67,13 +76,18 @@ function LeaderboardModal({
     try {
       const snap = await getLeaderboardSnapshot();
       if (!snap) {
-        setError("Leaderboard isn’t available yet. Run the latest SQL from `supabase/schema.sql` in Supabase.");
+        setError(
+          "The leaderboard isn’t set up on the server yet. In Supabase, run the latest `get_leaderboard_snapshot` function from `supabase/schema.sql`, then try again.",
+        );
         setRows([]);
         return;
       }
       setRows(snap.rows);
-    } catch {
-      setError("Couldn’t load the leaderboard. Try again.");
+    } catch (e) {
+      console.error(e);
+      setError(
+        "We couldn’t load the leaderboard. Check your internet connection, wait a few seconds, and open it again. If this keeps happening, the service may be updating—try again later.",
+      );
       setRows([]);
     } finally {
       setLoading(false);
@@ -94,7 +108,7 @@ function LeaderboardModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-3 backdrop-blur-[2px] sm:p-4"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -104,7 +118,7 @@ function LeaderboardModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[min(36rem,88vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        className="flex max-h-[min(36rem,calc(100dvh-1.5rem))] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl sm:max-h-[min(36rem,88vh)]"
       >
         <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
           <div className="flex items-center gap-2">

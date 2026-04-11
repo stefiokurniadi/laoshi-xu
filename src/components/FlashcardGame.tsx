@@ -28,6 +28,14 @@ import {
   GUEST_DEMO_VOCAB_TIER_KEY,
 } from "@/lib/guestDemo";
 import Link from "next/link";
+import { Volume2, VolumeX } from "lucide-react";
+import {
+  pinyinSpeechSupported,
+  readPinyinAutoplayPreference,
+  speakHanzi,
+  writePinyinAutoplayPreference,
+} from "@/lib/pinyinSpeech";
+import type { TtsVoicePreset } from "@/lib/ttsVoice";
 
 type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "review" | "demo" };
 
@@ -42,7 +50,8 @@ const DEMO_AFTER_ANSWER_TIPS = [
   "Tip: Consecutive correct answers get more points",
   "Tip: Sign in to save your score and unlock the full word list",
   "Tip: If you got HSK 1 wrong, -9 points!",
-  "Tip: Guest play uses a curated HSK 1–4 demo set",
+  "Tip: Guest play uses a curated HSK 1 demo set",
+  "Tip: The login is free, and you can access all the features and words"
 ] as const;
 
 export function FlashcardGame({
@@ -51,6 +60,7 @@ export function FlashcardGame({
   onScoreChange,
   onReviewChange,
   demo,
+  ttsVoicePreset = "auto",
 }: {
   userId?: string;
   initialScore: number;
@@ -59,6 +69,8 @@ export function FlashcardGame({
   onReviewChange?: () => void;
   /** Guest trial: local points only, separate word API, capped rounds. */
   demo?: { fetchPath: string };
+  /** Global app setting: Mandarin speech synthesis voice preference. */
+  ttsVoicePreset?: TtsVoicePreset;
 }) {
   if (!demo && !userId) {
     throw new Error("FlashcardGame requires userId unless demo mode is enabled.");
@@ -88,8 +100,16 @@ export function FlashcardGame({
   const isAdvancingRef = useRef(false);
   /** Next round fetched in the background while the answer is visible (1.4s). */
   const pendingNextRef = useRef<Promise<{ payload: ApiPayload; nextMode: QuestionMode }> | null>(null);
+  const pinyinAutoplayTimerRef = useRef<number | null>(null);
   const [idkRemaining, setIdkRemaining] = useState(IDK_DAILY_LIMIT);
   const [showNextWordOverlay, setShowNextWordOverlay] = useState(false);
+  const [ttsPlaying, setTtsPlaying] = useState(false);
+  /** Default off (Mute); persisted in localStorage. */
+  const [pinyinAutoplayOn, setPinyinAutoplayOn] = useState(false);
+  const [speechOk, setSpeechOk] = useState(false);
+  /** Latest sound-on flag for PY autoplay effect (avoid re-firing when only toggling mute → sound). */
+  const pinyinAutoplayOnRef = useRef(false);
+  pinyinAutoplayOnRef.current = pinyinAutoplayOn;
 
   const restoreRound = useCallback((): boolean => {
     if (typeof window === "undefined") return false;
@@ -185,9 +205,103 @@ export function FlashcardGame({
   }, [initialScore]);
 
   useEffect(() => {
+    setSpeechOk(pinyinSpeechSupported());
+    setPinyinAutoplayOn(readPinyinAutoplayPreference());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    const prime = () => {
+      void synth.getVoices();
+    };
+    prime();
+    synth.addEventListener("voiceschanged", prime);
+    return () => synth.removeEventListener("voiceschanged", prime);
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     };
+  }, []);
+
+  /** Pinyin-mode card: hear the word (Mandarin) while the prompt shows pinyin. */
+  const speakHanziForPinyinPrompt = useCallback(
+    (hanzi: string) => {
+      if (!hanzi.trim() || trialLimitReached) return;
+      if (pinyinAutoplayTimerRef.current) {
+        clearTimeout(pinyinAutoplayTimerRef.current);
+        pinyinAutoplayTimerRef.current = null;
+      }
+      setTtsPlaying(true);
+      speakHanzi(hanzi.trim(), {
+        voicePreset: ttsVoicePreset,
+        onEnd: () => setTtsPlaying(false),
+      });
+    },
+    [trialLimitReached, ttsVoicePreset],
+  );
+
+  /** Non–pinyin modes: after any answer (right or wrong), hear the correct word in Mandarin (same quality as before). */
+  const speakCorrectAnswerHanzi = useCallback(
+    (hanzi: string) => {
+      if (!hanzi.trim() || trialLimitReached) return;
+      if (pinyinAutoplayTimerRef.current) {
+        clearTimeout(pinyinAutoplayTimerRef.current);
+        pinyinAutoplayTimerRef.current = null;
+      }
+      setTtsPlaying(true);
+      speakHanzi(hanzi.trim(), {
+        voicePreset: ttsVoicePreset,
+        onEnd: () => setTtsPlaying(false),
+      });
+    },
+    [trialLimitReached, ttsVoicePreset],
+  );
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setTtsPlaying(false);
+  }, [word?.id]);
+
+  useEffect(() => {
+    if (pinyinAutoplayTimerRef.current) {
+      clearTimeout(pinyinAutoplayTimerRef.current);
+      pinyinAutoplayTimerRef.current = null;
+    }
+    if (mode !== "PY_TO_MIX" || !word?.hanzi || trialLimitReached) return;
+    if (!pinyinAutoplayOnRef.current) return;
+    pinyinAutoplayTimerRef.current = window.setTimeout(() => {
+      pinyinAutoplayTimerRef.current = null;
+      speakHanziForPinyinPrompt(word.hanzi);
+    }, 180);
+    return () => {
+      if (pinyinAutoplayTimerRef.current) {
+        clearTimeout(pinyinAutoplayTimerRef.current);
+        pinyinAutoplayTimerRef.current = null;
+      }
+    };
+  }, [word?.id, mode, trialLimitReached, speakHanziForPinyinPrompt, word?.hanzi]);
+
+  const togglePinyinAutoplay = useCallback(() => {
+    setPinyinAutoplayOn((prev) => {
+      const next = !prev;
+      writePinyinAutoplayPreference(next);
+      if (!next) {
+        if (pinyinAutoplayTimerRef.current) {
+          clearTimeout(pinyinAutoplayTimerRef.current);
+          pinyinAutoplayTimerRef.current = null;
+        }
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+        setTtsPlaying(false);
+      }
+      return next;
+    });
   }, []);
 
   const load = useCallback(async (loadOpts?: { resetMode?: boolean }) => {
@@ -343,6 +457,10 @@ export function FlashcardGame({
       const pickedKey = `word:${opt.word.id}`;
       setReveal({ correctId: word.id, pickedKey });
 
+      if (pinyinAutoplayOn && speechOk && mode !== "PY_TO_MIX" && word.hanzi.trim()) {
+        speakCorrectAnswerHanzi(word.hanzi);
+      }
+
       const isCorrect = opt.word.id === word.id;
       const result = isCorrect ? "correct" : "wrong";
 
@@ -419,7 +537,20 @@ export function FlashcardGame({
 
       startPrefetchAndScheduleAdvance();
     },
-    [busy, demo, mode, onReviewChange, onScoreChange, reveal, source, startPrefetchAndScheduleAdvance, word],
+    [
+      busy,
+      demo,
+      mode,
+      onReviewChange,
+      onScoreChange,
+      pinyinAutoplayOn,
+      reveal,
+      source,
+      speakCorrectAnswerHanzi,
+      speechOk,
+      startPrefetchAndScheduleAdvance,
+      word,
+    ],
   );
 
   const pickDontKnow = useCallback(async () => {
@@ -440,6 +571,11 @@ export function FlashcardGame({
     setIdkRemaining(rem);
 
     setReveal({ correctId: word.id, pickedKey: "dontKnow" });
+
+    if (pinyinAutoplayOn && speechOk && mode !== "PY_TO_MIX" && word.hanzi.trim()) {
+      speakCorrectAnswerHanzi(word.hanzi);
+    }
+
     correctStreakRef.current = 0;
 
     try {
@@ -452,7 +588,21 @@ export function FlashcardGame({
     onScoreChange(scoreRef.current, 0);
 
     startPrefetchAndScheduleAdvance();
-  }, [busy, demo, idkRemaining, mode, onReviewChange, onScoreChange, reveal, startPrefetchAndScheduleAdvance, userId, word]);
+  }, [
+    busy,
+    demo,
+    idkRemaining,
+    mode,
+    onReviewChange,
+    onScoreChange,
+    pinyinAutoplayOn,
+    reveal,
+    speakCorrectAnswerHanzi,
+    speechOk,
+    startPrefetchAndScheduleAdvance,
+    userId,
+    word,
+  ]);
 
   const correctAnswerText = useMemo(() => (word && mode ? getAnswerText(mode, word) : ""), [mode, word]);
 
@@ -647,8 +797,37 @@ export function FlashcardGame({
           </div>
           </div>
 
-          <div className="text-sm text-zinc-500" aria-live="polite">
-            {tipsForFooter[afterAnswerTipIndex % tipsForFooter.length]}
+          <div className="flex items-center justify-between gap-3 text-sm text-zinc-500">
+            <p className="min-w-0 flex-1 leading-snug" aria-live="polite">
+              {tipsForFooter[afterAnswerTipIndex % tipsForFooter.length]}
+            </p>
+            {speechOk && word ? (
+              <button
+                type="button"
+                onClick={togglePinyinAutoplay}
+                className="inline-flex h-8 w-[8.75rem] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 text-sm font-normal text-zinc-500 shadow-sm transition-colors hover:bg-zinc-50"
+                title={
+                  pinyinAutoplayOn
+                    ? "Sound on: pinyin prompts auto-play Mandarin; other modes play the correct word after you answer."
+                    : "Mute: no speech. Turn on to hear audio."
+                }
+              >
+                {pinyinAutoplayOn ? (
+                  <>
+                    <Volume2
+                      className={`h-4 w-4 shrink-0 text-zinc-500 ${ttsPlaying ? "animate-pulse" : ""}`}
+                      aria-hidden
+                    />
+                    Sound on
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                    Mute
+                  </>
+                )}
+              </button>
+            ) : null}
           </div>
         </motion.div>
       </AnimatePresence>

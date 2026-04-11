@@ -45,6 +45,8 @@ export function Navbar({
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwOk, setPwOk] = useState<string | null>(null);
   const [pwBusy, setPwBusy] = useState(false);
+  /** `null` while checking Supabase identities (Google-only vs email password). */
+  const [pwKind, setPwKind] = useState<"set" | "change" | null>(null);
   const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -71,6 +73,16 @@ export function Navbar({
     setNewPwConfirm("");
     setPwError(null);
     setPwOk(null);
+    setPwKind(null);
+    void (async () => {
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const ids = user?.identities ?? [];
+      const hasEmailIdentity = ids.some((i) => i.provider === "email");
+      setPwKind(hasEmailIdentity ? "change" : "set");
+    })();
   }, []);
 
   const submitPassword = useCallback(async () => {
@@ -82,10 +94,6 @@ export function Navbar({
 
     if (!email) {
       setPwError("You must be signed in to change your password.");
-      return;
-    }
-    if (!oldPass) {
-      setPwError("Enter your old password.");
       return;
     }
     if (next.length < 6) {
@@ -100,7 +108,25 @@ export function Navbar({
     setPwBusy(true);
     try {
       const supabase = createSupabaseBrowserClient();
-      // Re-authenticate to verify old password before updating.
+
+      if (pwKind === "set") {
+        const { error } = await supabase.auth.updateUser({ password: next });
+        if (error) throw error;
+        setPwOk("Password saved. You can sign out and sign back in with this email and password.");
+        window.setTimeout(() => setPwOpen(false), 900);
+        return;
+      }
+
+      if (pwKind !== "change") {
+        setPwError("Could not determine account type. Close this dialog and try again.");
+        return;
+      }
+
+      if (!oldPass) {
+        setPwError("Enter your current password.");
+        return;
+      }
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password: oldPass,
@@ -112,11 +138,16 @@ export function Navbar({
       setPwOk("Password updated.");
       window.setTimeout(() => setPwOpen(false), 600);
     } catch (e) {
-      setPwError(e instanceof Error ? e.message : "Failed to update password.");
+      const raw = e instanceof Error ? e.message : "Failed to update password.";
+      setPwError(
+        raw.toLowerCase().includes("invalid login")
+          ? "Current password is incorrect. Try again or use Set password flow if you only used Google before."
+          : raw,
+      );
     } finally {
       setPwBusy(false);
     }
-  }, [email, newPw, newPwConfirm, oldPw]);
+  }, [email, newPw, newPwConfirm, oldPw, pwKind]);
 
   return (
     <div className="relative z-40 w-full bg-[#f0f6f7]/90 backdrop-blur-md">
@@ -240,7 +271,7 @@ export function Navbar({
                       role="menuitem"
                     >
                       <KeyRound className="h-4 w-4 text-zinc-500" />
-                      Change password
+                      Password
                     </button>
 
                     <div className="h-px bg-zinc-100" />
@@ -293,8 +324,16 @@ export function Navbar({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-base font-semibold text-zinc-900">Change password</div>
-                        <div className="mt-1 text-sm text-zinc-500">Set a new password for this account.</div>
+                        <div className="text-base font-semibold text-zinc-900">
+                          {pwKind === "set" ? "Set password" : pwKind === "change" ? "Change password" : "Password"}
+                        </div>
+                        <div className="mt-1 text-sm text-zinc-500">
+                          {pwKind === null
+                            ? "Checking your account…"
+                            : pwKind === "set"
+                              ? "Add a password so you can also sign in with email (e.g. after using Google)."
+                              : "Enter your current password, then choose a new one."}
+                        </div>
                       </div>
                       <button
                         type="button"
@@ -307,19 +346,24 @@ export function Navbar({
                     </div>
 
                     <div className="mt-4 grid gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-semibold text-zinc-500">Old password</label>
-                        <input
-                          type="password"
-                          value={oldPw}
-                          onChange={(e) => setOldPw(e.target.value)}
-                          minLength={6}
-                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-300 focus:ring-2 focus:ring-zinc-400/30"
-                          placeholder="Your current password"
-                          autoFocus
-                        />
-                      </div>
-                      <div>
+                      {pwKind === "change" ? (
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-zinc-500">Current password</label>
+                          <input
+                            type="password"
+                            value={oldPw}
+                            onChange={(e) => setOldPw(e.target.value)}
+                            minLength={6}
+                            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-300 focus:ring-2 focus:ring-zinc-400/30"
+                            placeholder="Your current password"
+                            autoFocus
+                          />
+                        </div>
+                      ) : null}
+                      {pwKind === null ? (
+                        <p className="py-4 text-center text-sm text-zinc-500">Loading…</p>
+                      ) : null}
+                      <div className={pwKind === null ? "hidden" : ""}>
                         <label className="mb-1 block text-xs font-semibold text-zinc-500">New password</label>
                         <input
                           type="password"
@@ -328,9 +372,10 @@ export function Navbar({
                           minLength={6}
                           className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm outline-none focus:border-zinc-300 focus:ring-2 focus:ring-zinc-400/30"
                           placeholder="At least 6 characters"
+                          autoFocus={pwKind === "set"}
                         />
                       </div>
-                      <div>
+                      <div className={pwKind === null ? "hidden" : ""}>
                         <label className="mb-1 block text-xs font-semibold text-zinc-500">
                           Confirm new password
                         </label>
@@ -365,7 +410,7 @@ export function Navbar({
                       </button>
                       <button
                         type="button"
-                        disabled={pwBusy}
+                        disabled={pwBusy || pwKind === null}
                         onClick={() => void submitPassword()}
                         className="rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
                       >

@@ -388,11 +388,15 @@ using (true);
 create table if not exists public.app_settings (
   id smallint primary key default 1 check (id = 1),
   google_login_enabled boolean not null default true,
+  tts_voice_preset text not null default 'auto',
   updated_at timestamptz not null default now()
 );
 
-insert into public.app_settings (id, google_login_enabled) values (1, true)
+insert into public.app_settings (id, google_login_enabled, tts_voice_preset) values (1, true, 'auto')
 on conflict (id) do nothing;
+
+alter table public.app_settings
+  add column if not exists tts_voice_preset text not null default 'auto';
 
 alter table public.app_settings enable row level security;
 

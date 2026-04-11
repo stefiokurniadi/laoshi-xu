@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { FlashcardGame } from "@/components/FlashcardGame";
 import { GUEST_DEMO_SCORE_KEY } from "@/lib/guestDemo";
+import type { TtsVoicePreset } from "@/lib/ttsVoice";
 
-export function PublicFlashcardShellClient() {
+export function PublicFlashcardShellClient({ ttsVoicePreset }: { ttsVoicePreset: TtsVoicePreset }) {
   const [score, setScore] = useState(0);
   const [delta, setDelta] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -40,6 +41,7 @@ export function PublicFlashcardShellClient() {
           <FlashcardGame
             demo={{ fetchPath: "/api/word/demo" }}
             initialScore={score}
+            ttsVoicePreset={ttsVoicePreset}
             onScoreChange={(nextScore, d) => {
               setScore(nextScore);
               setDelta(d);
