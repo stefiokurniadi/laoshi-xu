@@ -7,6 +7,7 @@ import { allowAuthRateLimit } from "@/lib/rateLimit";
 import { getRequestIpFromHeaders } from "@/lib/requestIp";
 import { getGoogleLoginEnabled } from "@/lib/appSettings.server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { safeInternalPath } from "@/lib/safeRedirect";
 
 async function guardAntiSpamAndRateLimit(
   formData: FormData,
@@ -107,7 +108,8 @@ export async function signInWithEmail(formData: FormData) {
     redirect(`/login?authError=${encodeURIComponent(mapSignInPasswordError(error))}`);
   }
 
-  redirect("/");
+  const next = safeInternalPath(String(formData.get("next") ?? "").trim());
+  redirect(next ?? "/");
 }
 
 export async function resendSignupConfirmation(formData: FormData) {

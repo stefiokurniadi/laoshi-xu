@@ -1,6 +1,15 @@
 "use client";
 
-import { ChevronDown, KeyRound, LogIn, LogOut, UserRound, X } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  KeyRound,
+  LogIn,
+  LogOut,
+  Trophy,
+  UserRound,
+  X,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -287,33 +296,58 @@ export function Navbar({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.98 }}
                     transition={{ duration: 0.14 }}
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-xl shadow-zinc-900/10 ring-1 ring-black/5"
                     role="menu"
                   >
-                    <div className="px-4 py-3">
-                      <div
-                        className="w-full truncate text-sm font-medium text-zinc-700"
-                        title={email ?? ""}
-                      >
-                        {email}
-                      </div>
-                      <div className="mt-2 border-t border-zinc-100 pt-2">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                          Highest ever rating
-                        </div>
+                    <div className="bg-gradient-to-br from-[#e8f3f4] via-[#eef6f7] to-[#f0f6f7] px-4 pb-4 pt-4">
+                      <div className="flex items-start gap-3">
                         <div
-                          className="mt-0.5 truncate text-xs font-medium text-zinc-800"
-                          title={peakRatingShort}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1a5156]/12 ring-1 ring-[#1a5156]/15"
+                          aria-hidden
                         >
-                          {peakRatingShort}
+                          <UserRound className="h-5 w-5 text-[#164448]" strokeWidth={2} />
                         </div>
-                        <div className="mt-0.5 text-[10px] tabular-nums text-zinc-500">
-                          Peak score: {peakPoints}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+                            Signed in as
+                          </p>
+                          <p
+                            className="mt-1 break-words text-sm font-semibold leading-snug tracking-tight text-zinc-900"
+                            title={email ?? ""}
+                          >
+                            {email}
+                          </p>
+                          <div className="mt-3 rounded-xl border border-[#1a5156]/12 bg-white/90 px-3 py-3 shadow-sm ring-1 ring-zinc-100">
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#1a5156]">
+                              <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-600" strokeWidth={2.5} aria-hidden />
+                              Highest ever rating
+                            </div>
+                            <p
+                              className="mt-2 truncate text-lg font-bold leading-tight text-[#123a3e]"
+                              title={peakRatingShort}
+                            >
+                              {peakRatingShort}
+                            </p>
+                            <p className="mt-1.5 text-xs tabular-nums text-zinc-600">
+                              Peak score:{" "}
+                              <span className="font-bold tabular-nums text-[#1a5156]">{peakPoints}</span>
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="h-px bg-zinc-100" />
+                    <div className="h-px bg-zinc-200/90" />
+
+                    <Link
+                      href="/my-learning"
+                      onClick={() => setAccountOpen(false)}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                      role="menuitem"
+                    >
+                      <BookOpen className="h-4 w-4 text-zinc-500" />
+                      My Learning
+                    </Link>
 
                     <button
                       type="button"
