@@ -3,6 +3,10 @@ import { applyUsableEnglishGlossFilter, isUsableEnglishGloss } from "@/lib/engli
 import { shuffle } from "@/lib/game";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { matchesWordShape } from "@/lib/wordShape";
+import { pickWeightedByStreak, type MasteryDownweightConfig } from "@/lib/wordSelection";
+
+const MASTERY_CANDIDATE_TARGET = 30;
+const MASTERY_CANDIDATE_MAX_ATTEMPTS = 100;
 
 function uniqueHanziChars(hanzi: string): string[] {
   const t = hanzi.trim();
@@ -14,29 +18,70 @@ function sharesHanziWith(hanzi: string, chars: readonly string[]): boolean {
   return chars.some((c) => hanzi.includes(c));
 }
 
-export async function getRandomWord(maxLevel = 9): Promise<HskWord> {
-  const supabase = await createSupabaseServerClient();
-  const clampedMax = Math.min(9, Math.max(1, Math.floor(maxLevel)));
+type SupabaseServer = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
-  const maxAttempts = 24;
-  let lastError: Error | null = null;
+async function fetchStreakMapForWordIds(
+  supabase: SupabaseServer,
+  userId: string,
+  wordIds: number[],
+): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  if (wordIds.length === 0) return map;
+  const unique = [...new Set(wordIds)];
+  const { data, error } = await supabase
+    .from("user_word_streaks")
+    .select("word_id, consecutive_correct")
+    .eq("user_id", userId)
+    .in("word_id", unique);
+  if (error) return map;
+  for (const row of data ?? []) {
+    const r = row as { word_id: number; consecutive_correct: number };
+    map.set(Number(r.word_id), Number(r.consecutive_correct));
+  }
+  return map;
+}
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const level = 1 + Math.floor(Math.random() * clampedMax);
+async function getRandomWordAtLevelUniform(supabase: SupabaseServer, level: number): Promise<HskWord | null> {
+  let countQuery = supabase
+    .from("hsk_words")
+    .select("id", { count: "exact", head: true })
+    .eq("level", level);
+  countQuery = applyUsableEnglishGlossFilter(countQuery);
+  const { count, error: countError } = await countQuery;
+  if (countError) throw countError;
+  if (!count || count < 1) return null;
 
-    let countQuery = supabase
-      .from("hsk_words")
-      .select("id", { count: "exact", head: true })
-      .eq("level", level);
-    countQuery = applyUsableEnglishGlossFilter(countQuery);
+  const offset = Math.floor(Math.random() * count);
+  let selectQuery = supabase
+    .from("hsk_words")
+    .select("id,hanzi,pinyin,english,level")
+    .eq("level", level);
+  selectQuery = applyUsableEnglishGlossFilter(selectQuery);
+  const { data, error } = await selectQuery.range(offset, offset);
+  if (error) throw error;
+  const row = data?.[0] as HskWord | undefined;
+  if (row && isUsableEnglishGloss(row.english)) return row;
+  return null;
+}
 
-    const { count, error: countError } = await countQuery;
-    if (countError) throw countError;
-    if (!count || count < 1) {
-      lastError = new Error(`No usable words for HSK level ${level} (after filtering meta glosses).`);
-      continue;
-    }
+async function getRandomWordAtLevelWeighted(
+  supabase: SupabaseServer,
+  level: number,
+  userId: string,
+  mastery: MasteryDownweightConfig,
+): Promise<HskWord | null> {
+  const byId = new Map<number, HskWord>();
 
+  let countQuery = supabase
+    .from("hsk_words")
+    .select("id", { count: "exact", head: true })
+    .eq("level", level);
+  countQuery = applyUsableEnglishGlossFilter(countQuery);
+  const { count, error: countError } = await countQuery;
+  if (countError) throw countError;
+  if (!count || count < 1) return null;
+
+  for (let a = 0; a < MASTERY_CANDIDATE_MAX_ATTEMPTS && byId.size < MASTERY_CANDIDATE_TARGET; a++) {
     const offset = Math.floor(Math.random() * count);
     let selectQuery = supabase
       .from("hsk_words")
@@ -46,9 +91,55 @@ export async function getRandomWord(maxLevel = 9): Promise<HskWord> {
     const { data, error } = await selectQuery.range(offset, offset);
     if (error) throw error;
     const row = data?.[0] as HskWord | undefined;
-    if (row && isUsableEnglishGloss(row.english)) {
-      return row;
+    if (row && isUsableEnglishGloss(row.english) && !byId.has(row.id)) {
+      byId.set(row.id, row);
     }
+  }
+
+  const candidates = [...byId.values()];
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0]!;
+
+  const streakMap = await fetchStreakMapForWordIds(supabase, userId, candidates.map((w) => w.id));
+  return pickWeightedByStreak(candidates, streakMap, mastery);
+}
+
+export async function getRandomWord(
+  maxLevel = 9,
+  opts?: {
+    mastery?: { config: MasteryDownweightConfig; userId: string };
+  },
+): Promise<HskWord> {
+  const supabase = await createSupabaseServerClient();
+  const clampedMax = Math.min(9, Math.max(1, Math.floor(maxLevel)));
+
+  const maxAttempts = 24;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const level = 1 + Math.floor(Math.random() * clampedMax);
+
+    if (opts?.mastery) {
+      try {
+        const w = await getRandomWordAtLevelWeighted(
+          supabase,
+          level,
+          opts.mastery.userId,
+          opts.mastery.config,
+        );
+        if (w) return w;
+      } catch {
+        /* fall through to uniform */
+      }
+      const fallback = await getRandomWordAtLevelUniform(supabase, level);
+      if (fallback) return fallback;
+      lastError = new Error(`No usable words for HSK level ${level} (after filtering meta glosses).`);
+      continue;
+    }
+
+    const row = await getRandomWordAtLevelUniform(supabase, level);
+    if (row) return row;
+    lastError = new Error(`No usable words for HSK level ${level} (after filtering meta glosses).`);
   }
 
   throw (
@@ -276,7 +367,9 @@ export async function countUserFailedWords(): Promise<number> {
   return count ?? 0;
 }
 
-export async function getRandomReviewWord(): Promise<HskWord | null> {
+export async function getRandomReviewWord(opts?: {
+  mastery?: { config: MasteryDownweightConfig; userId: string };
+}): Promise<HskWord | null> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -296,6 +389,19 @@ export async function getRandomReviewWord(): Promise<HskWord | null> {
     .map((r) => r.hsk_words)
     .filter((w): w is HskWord => w != null && isUsableEnglishGloss(w.english));
   if (pool.length === 0) return null;
-  return pool[Math.floor(Math.random() * pool.length)];
+
+  const byId = new Map<number, HskWord>();
+  for (const w of pool) {
+    if (!byId.has(w.id)) byId.set(w.id, w);
+  }
+  const uniquePool = [...byId.values()];
+  if (uniquePool.length === 1) return uniquePool[0]!;
+
+  if (opts?.mastery && opts.mastery.userId === user.id) {
+    const streakMap = await fetchStreakMapForWordIds(supabase, user.id, uniquePool.map((w) => w.id));
+    return pickWeightedByStreak(uniquePool, streakMap, opts.mastery.config);
+  }
+
+  return uniquePool[Math.floor(Math.random() * uniquePool.length)]!;
 }
 

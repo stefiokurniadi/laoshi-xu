@@ -6,6 +6,7 @@ import {
   getRandomWord,
   getRandomReviewWord,
 } from "@/lib/hsk.server";
+import { getMasteryDownweightConfig } from "@/lib/appSettings.server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -44,9 +45,19 @@ export async function GET(request: Request) {
     if (failedCount > 20) reviewMixProbability = 0.7;
     else if (failedCount > 10) reviewMixProbability = 0.55;
   }
+  const masteryOpts =
+    user != null
+      ? {
+          mastery: {
+            config: await getMasteryDownweightConfig(),
+            userId: user.id,
+          },
+        }
+      : undefined;
+
   const shouldMixReview = Math.random() < reviewMixProbability;
-  const reviewWord = shouldMixReview ? await getRandomReviewWord() : null;
-  const word = reviewWord ?? (await getRandomWord(maxLevel));
+  const reviewWord = shouldMixReview ? await getRandomReviewWord(masteryOpts) : null;
+  const word = reviewWord ?? (await getRandomWord(maxLevel, masteryOpts));
 
   const overlapHanzi =
     nextMode === "HZ_TO_EN" || nextMode === "PY_TO_MIX" ? word.hanzi : undefined;

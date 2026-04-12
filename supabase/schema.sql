@@ -155,6 +155,73 @@ $$;
 revoke all on function public.touch_failed_word(bigint) from public;
 grant execute on function public.touch_failed_word(bigint) to authenticated;
 
+-- 3a) Per-word consecutive correct (for downweighting “mastered” words in random draw)
+create table if not exists public.user_word_streaks (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  word_id bigint not null references public.hsk_words(id) on delete cascade,
+  consecutive_correct smallint not null default 0
+    check (consecutive_correct >= 0 and consecutive_correct <= 5),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, word_id)
+);
+
+create index if not exists user_word_streaks_user_id_idx
+on public.user_word_streaks(user_id);
+
+alter table public.user_word_streaks enable row level security;
+
+create policy "user_word_streaks_select_own"
+on public.user_word_streaks
+for select
+using (auth.uid() = user_id);
+
+create policy "user_word_streaks_insert_own"
+on public.user_word_streaks
+for insert
+with check (auth.uid() = user_id);
+
+create policy "user_word_streaks_update_own"
+on public.user_word_streaks
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "user_word_streaks_delete_own"
+on public.user_word_streaks
+for delete
+using (auth.uid() = user_id);
+
+-- Client records outcome after each scored answer; used by GET /api/word weighted picker.
+create or replace function public.record_word_answer_outcome(p_word_id bigint, p_correct boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+
+  if p_correct then
+    insert into public.user_word_streaks (user_id, word_id, consecutive_correct, updated_at)
+    values (auth.uid(), p_word_id, 1, now())
+    on conflict (user_id, word_id) do update
+      set consecutive_correct = least(public.user_word_streaks.consecutive_correct + 1, 5),
+          updated_at = now();
+  else
+    insert into public.user_word_streaks (user_id, word_id, consecutive_correct, updated_at)
+    values (auth.uid(), p_word_id, 0, now())
+    on conflict (user_id, word_id) do update
+      set consecutive_correct = 0,
+          updated_at = now();
+  end if;
+end;
+$$;
+
+revoke all on function public.record_word_answer_outcome(bigint, boolean) from public;
+grant execute on function public.record_word_answer_outcome(bigint, boolean) to authenticated;
+
 -- 3b) Daily "I don't know" quota (3 uses per calendar day; use_date = client local YYYY-MM-DD)
 create table if not exists public.idk_daily_uses (
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -480,14 +547,26 @@ create table if not exists public.app_settings (
   id smallint primary key default 1 check (id = 1),
   google_login_enabled boolean not null default true,
   tts_voice_preset text not null default 'auto',
+  mastery_streak_threshold smallint not null default 5
+    check (mastery_streak_threshold >= 1 and mastery_streak_threshold <= 50),
+  mastery_relative_weight double precision not null default 0.15
+    check (mastery_relative_weight > 0::double precision and mastery_relative_weight <= 1::double precision),
   updated_at timestamptz not null default now()
 );
 
-insert into public.app_settings (id, google_login_enabled, tts_voice_preset) values (1, true, 'auto')
-on conflict (id) do nothing;
-
+-- Add columns before any INSERT that names them (existing DBs may already have app_settings without these).
 alter table public.app_settings
   add column if not exists tts_voice_preset text not null default 'auto';
+
+alter table public.app_settings
+  add column if not exists mastery_streak_threshold smallint not null default 5;
+
+alter table public.app_settings
+  add column if not exists mastery_relative_weight double precision not null default 0.15;
+
+insert into public.app_settings (id, google_login_enabled, tts_voice_preset, mastery_streak_threshold, mastery_relative_weight)
+values (1, true, 'auto', 5, 0.15)
+on conflict (id) do nothing;
 
 alter table public.app_settings enable row level security;
 

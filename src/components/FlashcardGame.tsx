@@ -14,6 +14,7 @@ import {
 import { fetchIdkRemaining, consumeIdkQuota } from "@/app/actions/idkQuota";
 import { incrementPoints } from "@/app/actions/profile";
 import { removeFailedWord, upsertFailedWord } from "@/app/actions/review";
+import { recordWordAnswerOutcome } from "@/app/actions/wordStreak";
 import {
   consumeIdkIfAllowedLocal,
   getIdkRemainingLocal,
@@ -517,6 +518,8 @@ export function FlashcardGame({
         // Ignore review sync failures (e.g. auth issues) without blocking gameplay.
       }
 
+      void recordWordAnswerOutcome(word.id, isCorrect);
+
       try {
         const nextTotal = await incrementPoints(delta, mode);
         onScoreChange(nextTotal, delta);
@@ -575,6 +578,8 @@ export function FlashcardGame({
     } catch {
       /* ignore */
     }
+
+    void recordWordAnswerOutcome(word.id, false);
 
     onScoreChange(scoreRef.current, 0);
 
@@ -679,7 +684,7 @@ export function FlashcardGame({
           transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           className="space-y-4"
         >
-          <div className="rounded-3xl border border-zinc-200 bg-gradient-to-b from-zinc-50 to-white p-6 shadow-sm">
+          <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm lg:max-h-[min(31.2rem,71.5vh)] lg:overflow-y-auto lg:overscroll-contain">
             <div className="text-xs font-semibold text-zinc-500">{prompt?.label ?? "…"}</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
               {prompt?.value ?? "Loading…"}

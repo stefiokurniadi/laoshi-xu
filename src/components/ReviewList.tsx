@@ -3,8 +3,9 @@
 import type { ReviewListRow } from "@/lib/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isMissingDbObjectError } from "@/lib/supabaseMissingSchema";
+import { ChevronDown } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 type ReviewSortKey = "times_seen" | "level" | "last_seen";
 
@@ -49,9 +50,27 @@ export function ReviewList({
 }) {
   const [rows, setRows] = useState<ReviewListRow[]>(initialRows);
   const [sortBy, setSortBy] = useState<ReviewSortKey>("times_seen");
+  const [showScrollMoreHint, setShowScrollMoreHint] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const sortedRows = useMemo(() => sortReviewRows(rows, sortBy), [rows, sortBy]);
+
+  const syncScrollHint = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || typeof window === "undefined") return;
+    if (!window.matchMedia("(min-width: 1024px)").matches) {
+      setShowScrollMoreHint(false);
+      return;
+    }
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    if (scrollHeight <= clientHeight + 2) {
+      setShowScrollMoreHint(false);
+      return;
+    }
+    const atBottom = scrollTop + clientHeight >= scrollHeight - 4;
+    setShowScrollMoreHint(!atBottom);
+  }, []);
 
   const refetch = useCallback(async () => {
     let data: unknown[] | null = null;
@@ -122,6 +141,24 @@ export function ReviewList({
     return () => clearTimeout(t);
   }, [refreshEpoch, refetch]);
 
+  useLayoutEffect(() => {
+    syncScrollHint();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", syncScrollHint, { passive: true });
+    const ro = new ResizeObserver(syncScrollHint);
+    ro.observe(el);
+    const mq = window.matchMedia("(min-width: 1024px)");
+    mq.addEventListener("change", syncScrollHint);
+    window.addEventListener("resize", syncScrollHint);
+    return () => {
+      el.removeEventListener("scroll", syncScrollHint);
+      ro.disconnect();
+      mq.removeEventListener("change", syncScrollHint);
+      window.removeEventListener("resize", syncScrollHint);
+    };
+  }, [syncScrollHint, rows]);
+
   return (
     <div
       id="review-list"
@@ -161,44 +198,67 @@ export function ReviewList({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200">
-        <table className="w-full text-left text-base">
-          <thead className="bg-zinc-50 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            <tr>
-              <th className="w-14 min-w-[3.5rem] px-2 py-2 text-center">HSK</th>
-              <th className="px-3 py-2">Hanzi</th>
-              <th className="px-3 py-2">Pinyin</th>
-              <th className="px-3 py-2">English</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRows.length === 0 ? (
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          className="rounded-2xl border border-zinc-200 lg:max-h-[min(31.2rem,71.5vh)] lg:overflow-y-auto lg:overscroll-contain"
+        >
+          <table className="w-full text-left text-base">
+            <thead className="bg-zinc-50 text-sm font-semibold uppercase tracking-wide text-zinc-500 lg:sticky lg:top-0 lg:z-[1] lg:shadow-[0_1px_0_0_rgb(228_228_231)]">
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
-                  Nothing here yet. Keep going.
-                </td>
+                <th className="w-14 min-w-[3.5rem] px-2 py-2 text-center">HSK</th>
+                <th className="px-3 py-2">Hanzi</th>
+                <th className="px-3 py-2">Pinyin</th>
+                <th className="px-3 py-2">English</th>
               </tr>
-            ) : (
-              sortedRows.map((r) => {
-                const t = r.times_seen;
-                return (
-                  <tr
-                    key={r.word.id}
-                    title={`Reviewed ${t} time${t === 1 ? "" : "s"}`}
-                    className={reviewRowClass(t)}
-                  >
-                    <td className="w-14 min-w-[3.5rem] px-2 py-2 text-center align-middle tabular-nums text-zinc-600">
-                      {r.word.level}
-                    </td>
-                    <td className="px-3 py-2 align-middle font-semibold text-zinc-900">{r.word.hanzi}</td>
-                    <td className="px-3 py-2 align-middle text-zinc-700">{r.word.pinyin}</td>
-                    <td className="px-3 py-2 align-middle text-zinc-700">{r.word.english}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
+                    Nothing here yet. Keep going.
+                  </td>
+                </tr>
+              ) : (
+                sortedRows.map((r) => {
+                  const t = r.times_seen;
+                  return (
+                    <tr
+                      key={r.word.id}
+                      title={`Reviewed ${t} time${t === 1 ? "" : "s"}`}
+                      className={reviewRowClass(t)}
+                    >
+                      <td className="w-14 min-w-[3.5rem] px-2 py-2 text-center align-middle tabular-nums text-zinc-600">
+                        {r.word.level}
+                      </td>
+                      <td className="px-3 py-2 align-middle font-semibold text-zinc-900">{r.word.hanzi}</td>
+                      <td className="px-3 py-2 align-middle text-zinc-700">{r.word.pinyin}</td>
+                      <td className="px-3 py-2 align-middle text-zinc-700">{r.word.english}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        {showScrollMoreHint ? (
+          <>
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] hidden h-14 rounded-b-2xl bg-gradient-to-t from-white from-35% via-white/70 to-transparent lg:block"
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute bottom-2 left-0 right-0 z-[3] hidden justify-center lg:flex"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-200/90 bg-white/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 shadow-sm">
+                <ChevronDown className="h-3 w-3 shrink-0" aria-hidden />
+                Scroll for more
+              </span>
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
