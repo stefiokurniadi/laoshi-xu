@@ -108,9 +108,10 @@ export async function getRandomWord(
   maxLevel = 9,
   opts?: {
     mastery?: { config: MasteryDownweightConfig; userId: string };
+    supabase?: SupabaseServer;
   },
 ): Promise<HskWord> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = opts?.supabase ?? (await createSupabaseServerClient());
   const clampedMax = Math.min(9, Math.max(1, Math.floor(maxLevel)));
 
   const maxAttempts = 24;
@@ -159,9 +160,10 @@ export async function getDistractors(
     overlapHanzi?: string;
     /** If false, do not apply shape matching (much larger pool). */
     strictShape?: boolean;
+    supabase?: SupabaseServer;
   },
 ): Promise<HskWord[]> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = options.supabase ?? (await createSupabaseServerClient());
 
   const fetchLimit = options.overlapHanzi ? 1200 : 900;
   const strictShape = options.strictShape ?? true;
@@ -351,6 +353,16 @@ export async function getDemoDistractors(
   return picked;
 }
 
+/** Rows in `failed_words` for a user (review mix tuning). */
+export async function countFailedWordsForUser(supabase: SupabaseServer, userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("failed_words")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 /** Rows in `failed_words` for the current user (for tuning review mix frequency). */
 export async function countUserFailedWords(): Promise<number> {
   const supabase = await createSupabaseServerClient();
@@ -358,28 +370,31 @@ export async function countUserFailedWords(): Promise<number> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return 0;
-
-  const { count, error } = await supabase
-    .from("failed_words")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id);
-  if (error) return 0;
-  return count ?? 0;
+  return countFailedWordsForUser(supabase, user.id);
 }
 
 export async function getRandomReviewWord(opts?: {
   mastery?: { config: MasteryDownweightConfig; userId: string };
+  supabase?: SupabaseServer;
+  /** When set (e.g. from a route that already called `getUser`), skips a redundant auth round-trip. */
+  authenticatedUserId?: string | null;
 }): Promise<HskWord | null> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const supabase = opts?.supabase ?? (await createSupabaseServerClient());
+  let userId: string | null;
+  if (opts?.authenticatedUserId !== undefined) {
+    userId = opts.authenticatedUserId;
+  } else {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    userId = user?.id ?? null;
+  }
+  if (!userId) return null;
 
   const { data, error } = await supabase
     .from("failed_words")
     .select("hsk_words(id,hanzi,pinyin,english,level)")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("last_seen", { ascending: false })
     .limit(160);
   if (error) return null;
@@ -397,8 +412,8 @@ export async function getRandomReviewWord(opts?: {
   const uniquePool = [...byId.values()];
   if (uniquePool.length === 1) return uniquePool[0]!;
 
-  if (opts?.mastery && opts.mastery.userId === user.id) {
-    const streakMap = await fetchStreakMapForWordIds(supabase, user.id, uniquePool.map((w) => w.id));
+  if (opts?.mastery && opts.mastery.userId === userId) {
+    const streakMap = await fetchStreakMapForWordIds(supabase, userId, uniquePool.map((w) => w.id));
     return pickWeightedByStreak(uniquePool, streakMap, opts.mastery.config);
   }
 

@@ -55,6 +55,14 @@ const DEMO_AFTER_ANSWER_TIPS = [
   "Tip: The login is free, and you can access all the features and words"
 ] as const;
 
+/** Time to show right/wrong feedback (and overlap with next-word prefetch) before advancing. */
+const POST_ANSWER_TO_NEXT_MS = 1400;
+
+/** Parallel background fetches so the next transitions rarely wait on the network. */
+const PREFETCH_DEPTH = 3;
+
+type PrefetchSlot = { requestMode: QuestionMode; promise: Promise<ApiPayload> };
+
 export function FlashcardGame({
   userId,
   initialScore,
@@ -99,8 +107,8 @@ export function FlashcardGame({
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** True only when `load()` runs right after the post-answer delay (next word transition). */
   const isAdvancingRef = useRef(false);
-  /** Next round fetched in the background while the answer is visible (1.4s). */
-  const pendingNextRef = useRef<Promise<{ payload: ApiPayload; nextMode: QuestionMode }> | null>(null);
+  /** FIFO queue: each slot fixes `requestMode` (sequential `rotateMode` chain) and a matching fetch. */
+  const prefetchQueueRef = useRef<PrefetchSlot[]>([]);
   const pinyinAutoplayTimerRef = useRef<number | null>(null);
   const [idkRemaining, setIdkRemaining] = useState(IDK_DAILY_LIMIT);
   const [showNextWordOverlay, setShowNextWordOverlay] = useState(false);
@@ -112,11 +120,11 @@ export function FlashcardGame({
   const pinyinAutoplayOnRef = useRef(false);
   pinyinAutoplayOnRef.current = pinyinAutoplayOn;
 
-  const restoreRound = useCallback((): boolean => {
-    if (typeof window === "undefined") return false;
+  const restoreRound = useCallback((): QuestionMode | null => {
+    if (typeof window === "undefined") return null;
     try {
       const raw = window.localStorage.getItem(roundStorageKey);
-      if (!raw) return false;
+      if (!raw) return null;
       const parsed = JSON.parse(raw) as {
         mode: QuestionMode;
         word: HskWord;
@@ -127,7 +135,7 @@ export function FlashcardGame({
         savedAt: number;
       };
       // Basic validation / forward-compat guard.
-      if (!parsed?.word?.id || !parsed?.mode || !Array.isArray(parsed?.options)) return false;
+      if (!parsed?.word?.id || !parsed?.mode || !Array.isArray(parsed?.options)) return null;
 
       setMode(parsed.mode);
       setWord(parsed.word);
@@ -135,9 +143,9 @@ export function FlashcardGame({
       setSource(parsed.source ?? "hsk");
       setReveal(parsed.reveal ?? null);
       setAfterAnswerTipIndex(typeof parsed.afterAnswerTipIndex === "number" ? parsed.afterAnswerTipIndex : 0);
-      return true;
+      return parsed.mode;
     } catch {
-      return false;
+      return null;
     }
   }, [roundStorageKey]);
 
@@ -183,6 +191,37 @@ export function FlashcardGame({
 
   /** Stable identity: parent often passes `demo={{ fetchPath }}` which is a new object every render — do not depend on `demo` itself. */
   const guestDemoFetchPath = demo?.fetchPath ?? null;
+
+  const fetchPayloadForMode = useCallback(
+    async (requestMode: QuestionMode): Promise<ApiPayload> => {
+      const qs = new URLSearchParams({ mode: requestMode });
+      if (guestDemoFetchPath) {
+        qs.set("vocabTier", String(guestVocabTierRef.current));
+      }
+      const url = guestDemoFetchPath
+        ? `${guestDemoFetchPath}?${qs.toString()}`
+        : `/api/word?${qs.toString()}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Failed to fetch word");
+      }
+      return (await res.json()) as ApiPayload;
+    },
+    [guestDemoFetchPath],
+  );
+
+  const topUpPrefetchQueue = useCallback(
+    (displayMode: QuestionMode) => {
+      const q = prefetchQueueRef.current;
+      while (q.length < PREFETCH_DEPTH) {
+        const anchor = q.length === 0 ? displayMode : q[q.length - 1]!.requestMode;
+        const requestMode = rotateMode(anchor);
+        q.push({ requestMode, promise: fetchPayloadForMode(requestMode) });
+      }
+    },
+    [fetchPayloadForMode],
+  );
 
   /** New tip each time the active word id changes (including first load). */
   useEffect(() => {
@@ -305,93 +344,82 @@ export function FlashcardGame({
     });
   }, []);
 
-  const load = useCallback(async (loadOpts?: { resetMode?: boolean }) => {
-    const fromAdvance = isAdvancingRef.current;
-    if (fromAdvance) {
-      setShowNextWordOverlay(true);
-    }
+  const load = useCallback(
+    async (loadOpts?: { resetMode?: boolean }) => {
+      const fromAdvance = isAdvancingRef.current;
+      if (fromAdvance) {
+        setShowNextWordOverlay(true);
+      }
 
-    setReveal(null);
+      if (loadOpts?.resetMode) {
+        prefetchQueueRef.current = [];
+      }
 
-    const pending = pendingNextRef.current;
-    pendingNextRef.current = null;
+      setReveal(null);
 
-    if (pending) {
+      const q = prefetchQueueRef.current;
+      if (q.length > 0) {
+        const slot = q.shift()!;
+        try {
+          const payload = await slot.promise;
+          setLoadError(null);
+          setMode(slot.requestMode);
+          setWord(payload.word);
+          setOptions(buildOptions(payload.word, payload.distractors));
+          setSource(payload.source === "demo" ? "demo" : payload.source);
+          topUpPrefetchQueue(slot.requestMode);
+          void syncIdkFromServer();
+          if (fromAdvance) {
+            setShowNextWordOverlay(false);
+            isAdvancingRef.current = false;
+          }
+          return;
+        } catch {
+          prefetchQueueRef.current = [];
+        }
+      }
+
+      setBusy(true);
+      setLoadError(null);
       try {
-        const { payload, nextMode } = await pending;
+        const modeBase = loadOpts?.resetMode ? null : mode;
+        const nextMode = rotateMode(modeBase);
+        const payload = await fetchPayloadForMode(nextMode);
         setMode(nextMode);
         setWord(payload.word);
         setOptions(buildOptions(payload.word, payload.distractors));
         setSource(payload.source === "demo" ? "demo" : payload.source);
-        void syncIdkFromServer();
+        topUpPrefetchQueue(nextMode);
+      } catch (e) {
+        prefetchQueueRef.current = [];
+        setLoadError(e instanceof Error ? e.message : "Couldn’t load a word.");
+        setWord(null);
+        setOptions([]);
+        setMode(null);
+      } finally {
+        setBusy(false);
         if (fromAdvance) {
           setShowNextWordOverlay(false);
           isAdvancingRef.current = false;
         }
-        return;
-      } catch {
-        /* prefetch failed — fetch below */
       }
-    }
-
-    setBusy(true);
-    setLoadError(null);
-    try {
-      const modeBase = loadOpts?.resetMode ? null : mode;
-      const nextMode = rotateMode(modeBase);
-      const qs = new URLSearchParams({ mode: nextMode });
-      if (demo) {
-        qs.set("vocabTier", String(guestVocabTierRef.current));
-      }
-      const url = demo ? `${demo.fetchPath}?${qs.toString()}` : `/api/word?${qs.toString()}`;
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "Failed to fetch word");
-      }
-      const payload = (await res.json()) as ApiPayload;
-      setMode(nextMode);
-      setWord(payload.word);
-      setOptions(buildOptions(payload.word, payload.distractors));
-      setSource(payload.source === "demo" ? "demo" : payload.source);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Couldn’t load a word.");
-      setWord(null);
-      setOptions([]);
-      setMode(null);
-    } finally {
-      setBusy(false);
-      if (fromAdvance) {
-        setShowNextWordOverlay(false);
-        isAdvancingRef.current = false;
-      }
-    }
-    void syncIdkFromServer();
-  }, [demo, mode, syncIdkFromServer]);
+      void syncIdkFromServer();
+    },
+    [fetchPayloadForMode, mode, syncIdkFromServer, topUpPrefetchQueue],
+  );
 
   const startPrefetchAndScheduleAdvance = useCallback(() => {
-    const nextMode = rotateMode(mode);
-    const qs = new URLSearchParams({ mode: nextMode });
-    if (demo) {
-      qs.set("vocabTier", String(guestVocabTierRef.current));
+    if (mode) {
+      topUpPrefetchQueue(mode);
     }
-    const url = demo ? `${demo.fetchPath}?${qs.toString()}` : `/api/word?${qs.toString()}`;
-    pendingNextRef.current = fetch(url, { cache: "no-store" }).then(async (res) => {
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "Failed to fetch word");
-      }
-      const payload = (await res.json()) as ApiPayload;
-      return { payload, nextMode };
-    });
 
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     advanceTimerRef.current = setTimeout(() => {
       advanceTimerRef.current = null;
       isAdvancingRef.current = true;
       void load();
-    }, 1400);
-  }, [demo, load, mode]);
+    }, POST_ANSWER_TO_NEXT_MS);
+  }, [load, mode, topUpPrefetchQueue]);
 
   useEffect(() => {
     if (demo) {
@@ -415,7 +443,11 @@ export function FlashcardGame({
         trialsUsedRef.current = 0;
       }
     }
-    if (restoreRound()) return;
+    const restoredMode = restoreRound();
+    if (restoredMode != null) {
+      topUpPrefetchQueue(restoredMode);
+      return;
+    }
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -426,7 +458,7 @@ export function FlashcardGame({
       clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = null;
     }
-    pendingNextRef.current = null;
+    prefetchQueueRef.current = [];
 
     const nextTier = guestVocabTierRef.current + 1;
     guestVocabTierRef.current = nextTier;
@@ -494,12 +526,12 @@ export function FlashcardGame({
         }
 
         if (hitCap) {
-          pendingNextRef.current = null;
+          prefetchQueueRef.current = [];
           if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
           advanceTimerRef.current = setTimeout(() => {
             advanceTimerRef.current = null;
             setTrialLimitReached(true);
-          }, 1400);
+          }, POST_ANSWER_TO_NEXT_MS);
           return;
         }
 
@@ -507,29 +539,36 @@ export function FlashcardGame({
         return;
       }
 
-      try {
-        if (result === "correct") {
-          await removeFailedWord(word.id);
-        } else {
-          await upsertFailedWord(word.id);
-        }
-        onReviewChange?.();
-      } catch {
-        // Ignore review sync failures (e.g. auth issues) without blocking gameplay.
-      }
-
-      void recordWordAnswerOutcome(word.id, isCorrect);
-
-      try {
-        const nextTotal = await incrementPoints(delta, mode);
-        onScoreChange(nextTotal, delta);
-      } catch {
-        const next = scoreRef.current + delta;
-        scoreRef.current = next;
-        onScoreChange(next, delta);
-      }
+      const optimisticNext = scoreRef.current + delta;
+      scoreRef.current = optimisticNext;
+      onScoreChange(optimisticNext, delta);
 
       startPrefetchAndScheduleAdvance();
+
+      void (async () => {
+        try {
+          if (result === "correct") {
+            await removeFailedWord(word.id);
+          } else {
+            await upsertFailedWord(word.id);
+          }
+          onReviewChange?.();
+        } catch {
+          /* ignore review sync failures */
+        }
+
+        void recordWordAnswerOutcome(word.id, isCorrect);
+
+        try {
+          const nextTotal = await incrementPoints(delta, mode);
+          if (nextTotal !== scoreRef.current) {
+            scoreRef.current = nextTotal;
+            onScoreChange(nextTotal, 0);
+          }
+        } catch {
+          /* optimistic score already applied */
+        }
+      })();
     },
     [
       busy,
@@ -572,18 +611,19 @@ export function FlashcardGame({
 
     correctStreakRef.current = 0;
 
-    try {
-      await upsertFailedWord(word.id);
-      onReviewChange?.();
-    } catch {
-      /* ignore */
-    }
-
-    void recordWordAnswerOutcome(word.id, false);
-
     onScoreChange(scoreRef.current, 0);
 
     startPrefetchAndScheduleAdvance();
+
+    void (async () => {
+      try {
+        await upsertFailedWord(word.id);
+        onReviewChange?.();
+      } catch {
+        /* ignore */
+      }
+      void recordWordAnswerOutcome(word.id, false);
+    })();
   }, [
     busy,
     demo,
