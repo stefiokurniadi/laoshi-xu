@@ -1,6 +1,3 @@
--- Baseline migration: full schema as of 2025-04-10 (see also ../schema.sql).
--- New changes: add a file via `npx supabase migration new <name>` (do not edit this baseline in place for new work).
-
 -- Supabase schema for Mandarin Learning Web App
 
 -- 1) Profiles

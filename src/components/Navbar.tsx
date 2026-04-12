@@ -9,6 +9,7 @@ import { signOut } from "@/app/actions/auth";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GeminiAdviseLauncher } from "@/components/GeminiAdviseLauncher";
 import { LeaderboardLauncher } from "@/components/LeaderboardLauncher";
+import { isDevChannel } from "@/lib/deployment";
 import { playerRatingLabel } from "@/lib/rating";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -164,6 +165,14 @@ export function Navbar({
     <div className="relative z-40 w-full bg-[#f0f6f7]/90 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-5 py-4 sm:gap-3">
         <div className="flex min-w-0 shrink items-center gap-2.5">
+          {isDevChannel() ? (
+            <span
+              className="shrink-0 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-950 sm:hidden"
+              title="Dev deployment: same database as production."
+            >
+              Dev
+            </span>
+          ) : null}
           {email ? (
             <div className="flex min-w-0 flex-col items-start text-left sm:hidden">
               <span
@@ -189,6 +198,14 @@ export function Navbar({
             <span className="truncate text-[19px] font-bold tracking-[0.2em] text-zinc-900">
               LAOSHI XU
             </span>
+            {isDevChannel() ? (
+              <span
+                className="shrink-0 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-950"
+                title="Dev deployment: same database as production. Use for experiments only."
+              >
+                Dev
+              </span>
+            ) : null}
           </Link>
         </div>
 
