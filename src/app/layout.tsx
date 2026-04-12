@@ -58,11 +58,11 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true },
   },
   alternates: { canonical: siteUrl },
-  // Favicons: use `app/icon.png` + `app/apple-icon.png` (Laoshi Xu logo) so the tab icon isn’t the Vercel default.
-  icons: {
-    icon: [{ url: "/laoshi-xu-logo.png", type: "image/png", sizes: "250x250" }],
-    apple: [{ url: "/laoshi-xu-logo.png", type: "image/png", sizes: "250x250" }],
-  },
+  /**
+   * Tab + Apple touch icons: use file convention (`src/app/icon.png`, `src/app/apple-icon.png`)
+   * so Next emits proper `<link rel="icon">` and `<link rel="apple-touch-icon">` tags.
+   * Safari (incl. iPad) often ignores generic metadata-only icons or caches old ones aggressively.
+   */
 };
 
 export const viewport: Viewport = {

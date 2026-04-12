@@ -13,7 +13,7 @@ import {
 } from "@/lib/game";
 import { fetchIdkRemaining, consumeIdkQuota } from "@/app/actions/idkQuota";
 import { incrementPoints } from "@/app/actions/profile";
-import { upsertFailedWord } from "@/app/actions/review";
+import { removeFailedWord, upsertFailedWord } from "@/app/actions/review";
 import {
   consumeIdkIfAllowedLocal,
   getIdkRemainingLocal,
@@ -506,13 +506,15 @@ export function FlashcardGame({
         return;
       }
 
-      if (result !== "correct") {
-        try {
+      try {
+        if (result === "correct") {
+          await removeFailedWord(word.id);
+        } else {
           await upsertFailedWord(word.id);
-          onReviewChange?.();
-        } catch {
-          // Ignore review failures (e.g. auth issues) without blocking gameplay.
         }
+        onReviewChange?.();
+      } catch {
+        // Ignore review sync failures (e.g. auth issues) without blocking gameplay.
       }
 
       try {
@@ -543,6 +545,7 @@ export function FlashcardGame({
 
   const pickDontKnow = useCallback(async () => {
     if (demo) return;
+    if (source === "review") return;
     if (!word || !mode || busy || reveal) return;
     if (idkRemaining <= 0) return;
 
@@ -585,6 +588,7 @@ export function FlashcardGame({
     onScoreChange,
     pinyinAutoplayOn,
     reveal,
+    source,
     speakCorrectAnswerHanzi,
     speechOk,
     startPrefetchAndScheduleAdvance,
@@ -595,6 +599,8 @@ export function FlashcardGame({
   const correctAnswerText = useMemo(() => (word && mode ? getAnswerText(mode, word) : ""), [mode, word]);
 
   const idkExhausted = idkRemaining <= 0;
+  const idkGuestLocked = Boolean(demo);
+  const idkReviewLocked = !demo && source === "review";
 
   const wordOptionsShown = useMemo(
     () => options.filter((opt): opt is { kind: "word"; word: HskWord } => opt.kind === "word"),
@@ -761,18 +767,26 @@ export function FlashcardGame({
                 ease: [0.22, 1, 0.36, 1],
                 delay: wordOptionsShown.length * 0.03,
               }}
-              disabled={busy || Boolean(reveal) || (demo ? true : idkExhausted)}
+              disabled={
+                busy ||
+                Boolean(reveal) ||
+                idkGuestLocked ||
+                idkReviewLocked ||
+                (!demo && idkExhausted)
+              }
               title={
-                demo
-                  ? "Sign in (free) to use “New word to me” — this feature is for signed-in learners."
-                  : undefined
+                idkGuestLocked
+                  ? "Sign in (free) to use “New word to me” — for signed-in learners."
+                  : idkReviewLocked
+                    ? "Not available on Previous Mistake cards — choose an answer to continue."
+                    : undefined
               }
               onClick={() => {
-                if (demo) return;
+                if (idkGuestLocked || idkReviewLocked) return;
                 void pickDontKnow();
               }}
-              className={`w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors sm:col-span-2 ${
-                demo
+              className={`col-span-full w-full rounded-2xl border px-4 py-3 text-center text-sm font-semibold shadow-sm transition-colors sm:col-span-2 ${
+                idkGuestLocked || idkReviewLocked
                   ? "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-500"
                   : reveal?.pickedKey === "dontKnow"
                     ? "z-[1] !bg-amber-200 !text-amber-950 disabled:cursor-default disabled:opacity-100"
@@ -781,12 +795,15 @@ export function FlashcardGame({
                       : "border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:cursor-not-allowed"
               }`}
             >
-              {demo ? (
+              {idkGuestLocked ? (
                 <span className="inline-flex flex-col items-center gap-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-2">
                   <span>New word to me</span>
-                  <span className="text-xs font-normal text-zinc-500">
-                    Sign in to use — for members only
-                  </span>
+                  <span className="text-xs font-normal text-zinc-500">Sign in (free) — signed-in learners only</span>
+                </span>
+              ) : idkReviewLocked ? (
+                <span className="inline-flex flex-col items-center gap-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-2">
+                  <span>New word to me</span>
+                  <span className="text-xs font-normal text-zinc-500">Not used for Previous Mistake</span>
                 </span>
               ) : idkExhausted ? (
                 "Wait until tomorrow"

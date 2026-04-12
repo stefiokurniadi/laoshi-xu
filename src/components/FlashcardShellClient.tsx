@@ -53,7 +53,8 @@ export function FlashcardShellClient({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <h2 className="min-w-0 text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
-                MISSION: Gain more points & Level up
+                <span className="sm:inline">MISSION: Gain more points </span>
+                <span className="block sm:inline">&amp; Level up</span>
               </h2>
               <button
                 type="button"

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Home, KeyRound, LogIn, LogOut, UserRound, X } from "lucide-react";
+import { ChevronDown, KeyRound, LogIn, LogOut, UserRound, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -162,30 +162,47 @@ export function Navbar({
 
   return (
     <div className="relative z-40 w-full bg-[#f0f6f7]/90 backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
-        <Link
-          href="/"
-          aria-label="Home"
-          className="flex min-w-0 shrink items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
-        >
-          <BrandLogo className="hidden h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 sm:block sm:h-11 sm:w-11" />
-          <Home className="h-7 w-7 shrink-0 text-zinc-800 sm:hidden" strokeWidth={2} aria-hidden />
-          <span className="hidden truncate text-[19px] font-bold tracking-[0.2em] text-zinc-900 sm:inline">
-            LAOSHI XU
-          </span>
-        </Link>
-
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-5 py-4 sm:gap-3">
+        <div className="flex min-w-0 shrink items-center gap-2.5">
           {email ? (
-            <div className="flex min-w-0 shrink flex-col items-end text-right">
+            <div className="flex min-w-0 flex-col items-start text-left sm:hidden">
               <span
-                className="block max-w-[min(42vw,9rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:max-w-[min(46vw,12rem)]"
+                className="block max-w-[min(52vw,11rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
                 title="User Rating"
               >
                 User Rating:
               </span>
               <span
-                className="mt-0.5 block max-w-[min(42vw,9rem)] truncate text-[12px] font-semibold text-zinc-800 sm:max-w-[min(46vw,12rem)]"
+                className="mt-0.5 block max-w-[min(52vw,11rem)] truncate text-[12px] font-semibold text-zinc-800"
+                title={ratingShort}
+              >
+                {ratingShort}
+              </span>
+            </div>
+          ) : null}
+          <Link
+            href="/"
+            aria-label="Home"
+            className="hidden min-w-0 shrink items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 sm:flex"
+          >
+            <BrandLogo className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 sm:h-11 sm:w-11" />
+            <span className="truncate text-[19px] font-bold tracking-[0.2em] text-zinc-900">
+              LAOSHI XU
+            </span>
+          </Link>
+        </div>
+
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+          {email ? (
+            <div className="hidden min-w-0 shrink flex-col items-end text-right sm:flex">
+              <span
+                className="block max-w-[min(46vw,12rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
+                title="User Rating"
+              >
+                User Rating:
+              </span>
+              <span
+                className="mt-0.5 block max-w-[min(46vw,12rem)] truncate text-[12px] font-semibold text-zinc-800"
                 title={ratingShort}
               >
                 {ratingShort}
