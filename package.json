@@ -11,7 +11,9 @@
     "import-hsk": "node scripts/import-hsk-complete-vocab.mjs",
     "import-hsk-ivankra": "node scripts/import-hsk-ivankra.mjs",
     "import-hsk-krmanik": "node scripts/import-hsk-krmanik.mjs",
-    "translate-hsk": "node scripts/translate-hsk-english.mjs"
+    "translate-hsk": "node scripts/translate-hsk-english.mjs",
+    "db:push": "npx supabase db push",
+    "db:migration:new": "npx supabase migration new"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Laoshi Xu
 
-## Getting Started
+Next.js app for Mandarin / HSK flashcards with Supabase (auth, Postgres, RLS, Realtime).
 
-First, run the development server:
+## Getting started
 
 ```bash
+npm install
+cp .env.example .env.local
+# Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SITE_URL, etc.
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Single production database, two hosts (www vs dev)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+You can run **one Supabase project** (production data) behind two deployed sites:
 
-## Learn More
+| Site | Example env | `NEXT_PUBLIC_SITE_URL` | `NEXT_PUBLIC_APP_CHANNEL` | Supabase |
+|------|-------------|-------------------------|---------------------------|----------|
+| Stable | Vercel **Production** (`main`) | `https://www.laoshixu.com` | omit or `stable` | Production URL + keys |
+| Experiments | Vercel deployment for `develop` (or second project) + domain `dev.laoshixu.com` | `https://dev.laoshixu.com` | `dev` | **Same** URL + keys as www |
 
-To learn more about Next.js, take a look at the following resources:
+**Tradeoff:** `dev.laoshixu.com` reads and writes the **same** database as www (profiles, review list, leaderboard, etc.). Testing mistakes affect real users. If you need isolated data, use a separate Supabase project for staging instead.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Feature gating:** Use [`src/lib/deployment.ts`](src/lib/deployment.ts) — `getAppChannel()`, `isDevChannel()`, `isDevHostFromHeaders(host)`. The navbar shows a **Dev** badge when `NEXT_PUBLIC_APP_CHANNEL=dev`. For dev-only API routes, check **both** channel and host on the server so a wrong env cannot expose behavior on www.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`next.config.ts` only redirects apex `laoshixu.com` → `www`; do **not** redirect `dev.laoshixu.com` to www.
 
-## Deploy on Vercel
+### Vercel checklist (dual deploy)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Production** (www): Git branch `main`, Production environment variables — `NEXT_PUBLIC_SITE_URL=https://www.laoshixu.com`, production Supabase keys, no `NEXT_PUBLIC_APP_CHANNEL` or `stable`.
+2. **Dev host:** Deploy the branch you use for experiments (e.g. `develop`). In Vercel → **Domains**, assign **`dev.laoshixu.com`** to that deployment (branch / project per your setup).
+3. Copy **the same** `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_SERVICE_ROLE_KEY` as production into this deployment’s env.
+4. Set **`NEXT_PUBLIC_SITE_URL=https://dev.laoshixu.com`** (must match the browser origin for auth redirects).
+5. Set **`NEXT_PUBLIC_APP_CHANNEL=dev`**.
+6. Redeploy after changing env vars.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Optional per-feature flags: add e.g. `NEXT_PUBLIC_FEATURE_X=true` only on the dev deployment.
+
+### Supabase Auth and Google OAuth checklist
+
+1. **Authentication → URL configuration:** add **Site URL** and **Redirect URLs** for both `https://www.laoshixu.com` and `https://dev.laoshixu.com` (and `http://localhost:3000` for local dev).
+2. **Google (or other) provider:** in Google Cloud Console, the OAuth client must allow Supabase’s callback URL (`https://<project-ref>.supabase.co/auth/v1/callback`). If users start OAuth from both hosts, ensure any extra **authorized JavaScript origins** / redirects Google requires include both front-end origins if applicable.
+
+Magic links and `emailRedirectTo` use `NEXT_PUBLIC_SITE_URL` from **each** Vercel deployment, so users return to the same host they started on.
+
+## Database migrations
+
+Schema is versioned in `supabase/migrations/`. `supabase/schema.sql` is a reference snapshot; new DDL should be new migration files.
+
+```bash
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npm run db:migration:new -- <name>   # edit the new file
+npm run db:push                      # apply to linked project
+```
+
+See [Supabase CLI migrations](https://supabase.com/docs/guides/cli/managing-environments) for `migration repair` on databases that already matched the baseline before migrations were tracked.
+
+## Learn more
+
+- [Next.js documentation](https://nextjs.org/docs)
+- [Supabase documentation](https://supabase.com/docs)

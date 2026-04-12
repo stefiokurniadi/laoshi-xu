@@ -35,11 +35,7 @@ export function FlashcardShellClient({
   }, [highestPoints, initialScore]);
 
   return (
-    <div className="relative flex min-h-[100svh] flex-col overflow-hidden bg-gradient-to-b from-[#f0f6f7] via-[#e4eef0] to-[#d6e6e8]">
-      <div
-        className="pointer-events-none absolute -top-28 left-1/2 h-[22rem] w-[min(44rem,100vw)] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_80%_60%_at_50%_30%,rgba(26,81,86,0.13),transparent_70%)] blur-3xl"
-        aria-hidden
-      />
+    <div className="relative flex min-h-0 flex-1 flex-col bg-[#f0f6f7]">
       <Navbar
         email={email}
         highestPoints={peakDisplayed}
@@ -48,11 +44,11 @@ export function FlashcardShellClient({
         leaderboardUserId={userId}
       />
 
-      <div className="relative z-0 mx-auto w-full max-w-6xl flex-1 px-5 py-6">
+      <div className="relative z-0 mx-auto w-full max-w-6xl min-h-0 flex-1 px-5 py-6">
         <div className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <h2 className="min-w-0 text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
+              <h2 className="min-w-0 pl-6 text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
                 <span className="sm:inline">MISSION: Gain more points </span>
                 <span className="block sm:inline">&amp; Level up</span>
               </h2>

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { getSiteUrl } from "@/lib/site";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SupabaseAuthHashCleanup } from "@/components/SupabaseAuthHashCleanup";
 import "./globals.css";
 
@@ -107,9 +108,7 @@ export default function RootLayout({
         <JsonLd />
         <SupabaseAuthHashCleanup />
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-        <footer className="shrink-0 py-2 text-center text-[10px] text-zinc-500 dark:text-zinc-600">
-          (c) copyrights by stefiokurniadi
-        </footer>
+        <SiteFooter />
         <Analytics />
         <SpeedInsights />
       </body>

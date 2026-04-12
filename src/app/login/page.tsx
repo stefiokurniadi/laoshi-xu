@@ -15,7 +15,7 @@ export default async function LoginPage(props: PageProps) {
 
   return (
     <main id="main-content" className="flex flex-1 flex-col">
-      <div className="flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center bg-gradient-to-b from-[#f0f6f7] via-[#e4eef0] to-[#d6e6e8] px-6 py-16 sm:py-20">
+      <div className="flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center bg-[#f0f6f7] px-6 py-16 sm:py-20">
         <AuthCard
           authError={authError}
           authNotice={authNotice}
