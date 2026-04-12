@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseQuestionMode } from "@/lib/game";
 import {
-  countUserFailedWords,
+  countFailedWordsForUser,
   getDistractors,
   getRandomWord,
   getRandomReviewWord,
@@ -9,6 +9,7 @@ import {
 import { getMasteryDownweightConfig } from "@/lib/appSettings.server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { MasteryDownweightConfig } from "@/lib/wordSelection";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -24,40 +25,41 @@ export async function GET(request: Request) {
   }
 
   let maxLevel = 2;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("total_points")
-      .eq("id", user.id)
-      .maybeSingle();
+  let reviewMixProbability = 0.25;
 
-    const points = profile?.total_points ?? 0;
+  const pickerBase = {
+    supabase,
+    authenticatedUserId: user?.id ?? null,
+  } as const;
+
+  const pickerOpts: {
+    supabase: typeof supabase;
+    authenticatedUserId: string | null;
+    mastery?: { config: MasteryDownweightConfig; userId: string };
+  } = { ...pickerBase };
+
+  if (user) {
+    const [profileRes, failedCount, masteryConfig] = await Promise.all([
+      supabase.from("profiles").select("total_points").eq("id", user.id).maybeSingle(),
+      countFailedWordsForUser(supabase, user.id),
+      getMasteryDownweightConfig(supabase),
+    ]);
+
+    const points = profileRes.data?.total_points ?? 0;
     if (points < 25) maxLevel = 2;
     else if (points < 100) maxLevel = 4;
     else if (points < 500) maxLevel = 6;
     else maxLevel = 9;
-  }
 
-  /** Larger review backlogs → higher chance to draw a review word. */
-  let reviewMixProbability = 0.25;
-  if (user) {
-    const failedCount = await countUserFailedWords();
     if (failedCount > 20) reviewMixProbability = 0.7;
     else if (failedCount > 10) reviewMixProbability = 0.55;
-  }
-  const masteryOpts =
-    user != null
-      ? {
-          mastery: {
-            config: await getMasteryDownweightConfig(),
-            userId: user.id,
-          },
-        }
-      : undefined;
 
-  const shouldMixReview = Math.random() < reviewMixProbability;
-  const reviewWord = shouldMixReview ? await getRandomReviewWord(masteryOpts) : null;
-  const word = reviewWord ?? (await getRandomWord(maxLevel, masteryOpts));
+    pickerOpts.mastery = { config: masteryConfig, userId: user.id };
+  }
+
+  const shouldMixReview = Boolean(user) && Math.random() < reviewMixProbability;
+  const reviewWord = shouldMixReview ? await getRandomReviewWord(pickerOpts) : null;
+  const word = reviewWord ?? (await getRandomWord(maxLevel, pickerOpts));
 
   const overlapHanzi =
     nextMode === "HZ_TO_EN" || nextMode === "PY_TO_MIX" ? word.hanzi : undefined;
@@ -65,6 +67,7 @@ export async function GET(request: Request) {
     overlapHanzi,
     shapeTarget: { hanzi: word.hanzi, pinyin: word.pinyin },
     strictShape: true,
+    supabase,
   });
 
   let distractors = primary;
@@ -73,6 +76,7 @@ export async function GET(request: Request) {
     const fallback = await getDistractors(word.level, word.id, need * 3, {
       shapeTarget: { hanzi: word.hanzi, pinyin: word.pinyin },
       strictShape: false,
+      supabase,
     });
     const existing = new Set(distractors.map((w) => w.id));
     for (const w of fallback) {

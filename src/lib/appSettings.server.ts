@@ -1,4 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+type SupabaseServer = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 import {
   DEFAULT_MASTERY_RELATIVE_WEIGHT,
   DEFAULT_MASTERY_STREAK_THRESHOLD,
@@ -40,9 +42,9 @@ export async function getTtsVoicePreset(): Promise<TtsVoicePreset> {
 }
 
 /** Per-word mastery downweighting for `/api/word` (streak ≥ threshold → relative pick weight). */
-export async function getMasteryDownweightConfig(): Promise<MasteryDownweightConfig> {
+export async function getMasteryDownweightConfig(db?: SupabaseServer): Promise<MasteryDownweightConfig> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = db ?? (await createSupabaseServerClient());
     const { data, error } = await supabase
       .from("app_settings")
       .select("mastery_streak_threshold, mastery_relative_weight")
