@@ -1,5 +1,7 @@
--- Supabase schema for Mandarin Learning Web App (reference snapshot).
--- New DDL: add a migration under supabase/migrations/ (see README “Database migrations”).
+-- Baseline migration: full schema as of 2025-04-10 (see also ../schema.sql).
+-- New changes: add a file via `npx supabase migration new <name>` (do not edit this baseline in place for new work).
+
+-- Supabase schema for Mandarin Learning Web App
 
 -- 1) Profiles
 create table if not exists public.profiles (
