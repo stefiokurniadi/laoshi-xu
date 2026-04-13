@@ -1,10 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { ListChecks } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReviewListRow } from "@/lib/types";
 import { Navbar } from "@/components/Navbar";
-import { FlashcardGame } from "@/components/FlashcardGame";
+import { FlashcardGameSkeleton } from "@/components/FlashcardGameSkeleton";
+
+const FlashcardGame = dynamic(
+  () => import("@/components/FlashcardGame").then((m) => ({ default: m.FlashcardGame })),
+  { loading: () => <FlashcardGameSkeleton />, ssr: true },
+);
 import { LeaderboardLauncher } from "@/components/LeaderboardLauncher";
 import { ReviewList } from "@/components/ReviewList";
 import type { TtsVoicePreset } from "@/lib/ttsVoice";
@@ -56,13 +62,13 @@ export function FlashcardShellClient({
         <div className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <h2 className="min-w-0 pl-6 text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
-                <span className="sm:inline">MISSION: Gain more points </span>
-                <span className="block sm:inline">&amp; Level up</span>
+              <h2 className="min-w-0 pl-6 text-lg font-semibold tracking-tight text-zinc-900 md:text-xl md:whitespace-nowrap">
+                <span>MISSION: Gain more points </span>
+                <span className="block md:inline">&amp; Level up</span>
               </h2>
               <button
                 type="button"
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a5156] shadow-sm transition hover:bg-zinc-50 sm:hidden"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1a5156] shadow-sm transition hover:bg-zinc-50 md:hidden"
                 onClick={() =>
                   document.getElementById("review-list")?.scrollIntoView({ behavior: "smooth", block: "start" })
                 }
@@ -71,7 +77,7 @@ export function FlashcardShellClient({
                 Review
               </button>
             </div>
-            <div className="hidden sm:block sm:shrink-0">
+            <div className="hidden shrink-0 lg:block">
               <LeaderboardLauncher userId={userId} />
             </div>
           </div>

@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { HskWord, Option, QuestionMode } from "@/lib/types";
+import type { HskWord, Option, QuestionMode, WordGameApiPayload } from "@/lib/types";
 import { buildOptions, getAnswerText, getPrompt, rotateMode, scoreDelta } from "@/lib/game";
 import { incrementFlashcardPoints } from "@/app/actions/flashcardPoints";
 import { incrementPoints } from "@/app/actions/profile";
 import { upsertFailedWord } from "@/app/actions/review";
 
-type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "review" | "demo" };
-
 const POST_REVEAL_TO_NEXT_MS = 1400;
 const PREFETCH_DEPTH = 3;
-type PrefetchSlot = { requestMode: QuestionMode; promise: Promise<ApiPayload> };
+type PrefetchSlot = { requestMode: QuestionMode; promise: Promise<WordGameApiPayload> };
 
 function primaryAnswerLabelForMode(mode: QuestionMode): "Hanzi" | "English" {
   // The "main answer" field the user is expected to recall for the prompt.
@@ -24,18 +22,25 @@ function primaryAnswerLabelForMode(mode: QuestionMode): "Hanzi" | "English" {
 export function Flashcard2Game({
   userId,
   initialFlashcardPoints,
+  initialPayload = null,
+  initialMode = null,
   onPointsChange,
   onReviewChange,
 }: {
   userId: string;
   initialFlashcardPoints: number;
+  /** First card from SSR so the client does not wait on /api/word for first paint. */
+  initialPayload?: WordGameApiPayload | null;
+  initialMode?: QuestionMode | null;
   onPointsChange: (next: number) => void;
   onReviewChange: () => void;
 }) {
   const roundStorageKey = useMemo(() => `laoshi-xu:flashcard2:round:${userId}`, [userId]);
-  const [mode, setMode] = useState<QuestionMode | null>(null);
-  const [word, setWord] = useState<HskWord | null>(null);
-  const [options, setOptions] = useState<Option[]>([]);
+  const [mode, setMode] = useState<QuestionMode | null>(() => initialMode ?? null);
+  const [word, setWord] = useState<HskWord | null>(() => initialPayload?.word ?? null);
+  const [options, setOptions] = useState<Option[]>(() =>
+    initialPayload ? buildOptions(initialPayload.word, initialPayload.distractors) : [],
+  );
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -98,14 +103,14 @@ export function Flashcard2Game({
     persistRound();
   }, [persistRound]);
 
-  const fetchPayloadForMode = useCallback(async (requestMode: QuestionMode): Promise<ApiPayload> => {
+  const fetchPayloadForMode = useCallback(async (requestMode: QuestionMode): Promise<WordGameApiPayload> => {
     const qs = new URLSearchParams({ mode: requestMode, points: "flashcard" });
     const res = await fetch(`/api/word?${qs.toString()}`, { cache: "no-store" });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? "Failed to fetch word");
     }
-    return (await res.json()) as ApiPayload;
+    return (await res.json()) as WordGameApiPayload;
   }, []);
 
   const topUpPrefetchQueue = useCallback(
@@ -162,6 +167,10 @@ export function Flashcard2Game({
 
   useEffect(() => {
     if (restoreRound()) return;
+    if (initialPayload && initialMode) {
+      topUpPrefetchQueue(initialMode);
+      return;
+    }
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

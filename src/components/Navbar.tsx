@@ -198,18 +198,27 @@ export function Navbar({
 
   return (
     <div className="relative z-40 w-full bg-[#f0f6f7]/90 backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-5 py-4 sm:gap-3">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-5 py-4 lg:gap-3">
         <div className="flex min-w-0 shrink items-center gap-2.5">
           {isDevChannel() ? (
             <span
-              className="shrink-0 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-950 sm:hidden"
+              className="shrink-0 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-950 lg:hidden"
               title="Dev deployment: same database as production."
             >
               Dev
             </span>
           ) : null}
+          {email ? (
+            <Link
+              href="/"
+              aria-label="Home"
+              className="hidden shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 md:flex lg:hidden"
+            >
+              <BrandLogo className="h-10 w-10 rounded-full object-cover ring-1 ring-zinc-200/80" />
+            </Link>
+          ) : null}
           {email && !hideTopRating ? (
-            <div className="flex min-w-0 flex-col items-start text-left sm:hidden">
+            <div className="flex min-w-0 flex-col items-start text-left lg:hidden">
               <span
                 className="block max-w-[min(52vw,11rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
                 title="User Rating"
@@ -228,7 +237,7 @@ export function Navbar({
             <Link
               href="/"
               aria-label="Home"
-              className="sm:hidden rounded-full outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
+              className="lg:hidden rounded-full outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
             >
               <BrandLogo className="h-10 w-10 rounded-full object-cover ring-1 ring-zinc-200/80" />
             </Link>
@@ -236,9 +245,9 @@ export function Navbar({
           <Link
             href="/"
             aria-label="Home"
-            className="hidden min-w-0 shrink items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 sm:flex"
+            className="hidden min-w-0 shrink items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 lg:flex"
           >
-            <BrandLogo className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 sm:h-11 sm:w-11" />
+            <BrandLogo className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-zinc-200/80 lg:h-11 lg:w-11" />
             <span className="truncate text-[19px] font-bold tracking-[0.2em] text-zinc-900">
               LAOSHI XU
             </span>
@@ -253,9 +262,9 @@ export function Navbar({
           </Link>
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 lg:gap-3">
           {email && !hideTopRating ? (
-            <div className="hidden min-w-0 shrink flex-col items-end text-right sm:flex">
+            <div className="hidden min-w-0 shrink flex-col items-end text-right lg:flex">
               <span
                 className="block max-w-[min(46vw,12rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
                 title="User Rating"
@@ -272,9 +281,9 @@ export function Navbar({
           ) : null}
 
           {hideScore ? null : (
-            <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-2.5 text-sm font-medium text-zinc-700 shadow-sm sm:gap-2 sm:px-4">
-              <span className="hidden font-semibold text-zinc-600 sm:inline">{pointLabel}</span>
-              <span className="font-semibold text-zinc-600 sm:hidden" aria-hidden>
+            <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-2.5 text-sm font-medium text-zinc-700 shadow-sm lg:gap-2 lg:px-4">
+              <span className="hidden font-semibold text-zinc-600 lg:inline">{pointLabel}</span>
+              <span className="font-semibold text-zinc-600 lg:hidden" aria-hidden>
                 🎯
               </span>
               <motion.span
@@ -311,8 +320,8 @@ export function Navbar({
                 aria-haspopup="menu"
                 aria-expanded={modeOpen}
               >
-                <span className="font-semibold sm:hidden">{modeLabelMobile ?? modeSwitcher.currentLabel}</span>
-                <span className="hidden sm:inline font-semibold">{modeSwitcher.currentLabel}</span>
+                <span className="font-semibold lg:hidden">{modeLabelMobile ?? modeSwitcher.currentLabel}</span>
+                <span className="hidden font-semibold lg:inline">{modeSwitcher.currentLabel}</span>
                 <ChevronDown className="h-4 w-4 text-white/80" aria-hidden />
               </button>
 
@@ -353,7 +362,7 @@ export function Navbar({
             </div>
           ) : null}
 
-          {/* Mobile leaderboard button moved into My profile menu */}
+          {/* Leaderboard in My profile: tablets/phones only; desktop uses quiz page inline control (lg+). */}
 
           {email ? (
             <GeminiAdviseLauncher />
@@ -366,14 +375,14 @@ export function Navbar({
               <button
                 type="button"
                 onClick={() => setAccountOpen((v) => !v)}
-                className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] sm:aspect-auto sm:h-10 sm:max-h-none sm:max-w-none sm:min-h-10 sm:min-w-0 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-semibold"
+                className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] lg:aspect-auto lg:h-10 lg:max-h-none lg:max-w-none lg:min-h-10 lg:min-w-0 lg:w-auto lg:gap-2 lg:px-4 lg:text-sm lg:font-semibold"
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
                 aria-label="My profile"
               >
-                <UserRound className="h-[1.125rem] w-[1.125rem] shrink-0 sm:hidden" strokeWidth={2} aria-hidden />
-                <span className="hidden font-semibold sm:inline">My profile</span>
-                <ChevronDown className="hidden h-4 w-4 shrink-0 text-white/75 sm:block" aria-hidden />
+                <UserRound className="h-[1.125rem] w-[1.125rem] shrink-0 lg:hidden" strokeWidth={2} aria-hidden />
+                <span className="hidden font-semibold lg:inline">My profile</span>
+                <ChevronDown className="hidden h-4 w-4 shrink-0 text-white/75 lg:block" aria-hidden />
               </button>
 
               <AnimatePresence>
@@ -427,7 +436,7 @@ export function Navbar({
                     <div className="h-px bg-zinc-200/90" />
 
                     {email && leaderboardUserId ? (
-                      <div className="px-4 py-3">
+                      <div className="px-4 py-3 lg:hidden">
                         <LeaderboardLauncher userId={leaderboardUserId} variant="default" />
                       </div>
                     ) : null}
@@ -463,7 +472,7 @@ export function Navbar({
           ) : loginHref ? (
             <Link
               href={loginHref}
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-black/10 bg-[#1a5156] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#164448] sm:h-10 sm:px-4 sm:text-sm sm:font-medium"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-black/10 bg-[#1a5156] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#164448] lg:h-10 lg:px-4 lg:text-sm lg:font-medium"
             >
               <LogIn className="h-[1.125rem] w-[1.125rem] shrink-0" strokeWidth={2} aria-hidden />
               <span className="font-semibold">Login</span>

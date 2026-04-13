@@ -1,7 +1,6 @@
 import { ensureProfile } from "@/app/actions/profile";
 import { FlashcardShell } from "@/app/flashcards/FlashcardShell";
 import { PublicFlashcardShellClient } from "@/components/PublicFlashcardShellClient";
-import { getTtsVoicePreset } from "@/lib/appSettings.server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { redirect } from "next/navigation";
@@ -41,8 +40,8 @@ async function Main() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    const ttsVoicePreset = await getTtsVoicePreset();
-    return <PublicFlashcardShellClient ttsVoicePreset={ttsVoicePreset} />;
+    // Skip getTtsVoicePreset() here — it blocked TTFB for every guest. FlashcardGame defaults TTS to "auto".
+    return <PublicFlashcardShellClient />;
   }
 
   if (isSuperadminEmail(user.email)) {

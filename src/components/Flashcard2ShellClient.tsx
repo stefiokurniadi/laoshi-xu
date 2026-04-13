@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ReviewListRow } from "@/lib/types";
+import type { QuestionMode, ReviewListRow, WordGameApiPayload } from "@/lib/types";
 import { Navbar } from "@/components/Navbar";
 import { ReviewList } from "@/components/ReviewList";
 import { Flashcard2Game } from "@/components/Flashcard2Game";
@@ -12,6 +12,8 @@ export function Flashcard2ShellClient({
   quizScore,
   quizHighestPoints,
   initialFlashcardPoints,
+  initialFlashcardMode,
+  initialFlashcardPayload,
   initialReviewRows,
 }: {
   email: string;
@@ -19,6 +21,8 @@ export function Flashcard2ShellClient({
   quizScore: number;
   quizHighestPoints: number;
   initialFlashcardPoints: number;
+  initialFlashcardMode: QuestionMode | null;
+  initialFlashcardPayload: WordGameApiPayload | null;
   initialReviewRows: ReviewListRow[];
 }) {
   const [points, setPoints] = useState(initialFlashcardPoints);
@@ -57,6 +61,8 @@ export function Flashcard2ShellClient({
             <Flashcard2Game
               userId={userId}
               initialFlashcardPoints={points}
+              initialPayload={initialFlashcardPayload}
+              initialMode={initialFlashcardMode}
               onPointsChange={(next) => setPoints(next)}
               onReviewChange={() => setReviewEpoch((e) => e + 1)}
             />

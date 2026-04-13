@@ -18,3 +18,10 @@ export type ReviewListRow = {
   word: HskWord;
 };
 
+/** Response shape for GET /api/word and SSR first flashcard. */
+export type WordGameApiPayload = {
+  word: HskWord;
+  distractors: HskWord[];
+  source: "hsk" | "review" | "demo";
+};
+
