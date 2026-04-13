@@ -50,6 +50,58 @@ alter table public.profiles
 alter table public.profiles
   add column if not exists last_advice_at timestamptz;
 
+-- 1c) Flashcard 2.0 points (separate from leaderboard / Quiz Mode)
+create table if not exists public.flashcard_points (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  total_points integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.flashcard_points enable row level security;
+
+create policy "flashcard_points_select_own"
+on public.flashcard_points
+for select
+using (auth.uid() = user_id);
+
+create policy "flashcard_points_insert_own"
+on public.flashcard_points
+for insert
+with check (auth.uid() = user_id);
+
+create policy "flashcard_points_update_own"
+on public.flashcard_points
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create or replace function public.increment_flashcard_points(delta integer)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_total integer;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+
+  insert into public.flashcard_points (user_id, total_points, updated_at)
+  values (auth.uid(), delta, now())
+  on conflict (user_id) do update
+    set total_points = flashcard_points.total_points + delta,
+        updated_at = now()
+  returning total_points into new_total;
+
+  return coalesce(new_total, 0);
+end;
+$$;
+
+revoke all on function public.increment_flashcard_points(integer) from public;
+grant execute on function public.increment_flashcard_points(integer) to authenticated;
+
 -- 1b) Gemini API usage log (inserts from Next.js service role; users can read own rows for UI)
 create table if not exists public.gemini_usage (
   id bigint generated always as identity primary key,
@@ -102,6 +154,12 @@ create table if not exists public.failed_words (
 alter table public.failed_words
   add column if not exists times_seen integer not null default 1;
 
+-- Track whether an entry came from Quiz Mode and/or Flashcard Mode (Flashcard 2.0).
+alter table public.failed_words
+  add column if not exists from_quiz boolean not null default false;
+alter table public.failed_words
+  add column if not exists from_flashcard boolean not null default false;
+
 create index if not exists failed_words_user_id_last_seen_idx
 on public.failed_words(user_id, last_seen desc);
 
@@ -129,7 +187,7 @@ for delete
 using (auth.uid() = user_id);
 
 -- Add / bump review entry (increments times_seen on repeat misses / skips)
-create or replace function public.touch_failed_word(p_word_id bigint)
+create or replace function public.touch_failed_word(p_word_id bigint, p_source text)
 returns void
 language plpgsql
 security definer
@@ -140,11 +198,27 @@ begin
     raise exception 'not authenticated';
   end if;
 
-  insert into public.failed_words (user_id, word_id, last_seen, times_seen)
-  values (auth.uid(), p_word_id, now(), 1)
+  if p_source is null or p_source = '' then
+    raise exception 'invalid source';
+  end if;
+  if p_source not in ('quiz', 'flashcard') then
+    raise exception 'invalid source';
+  end if;
+
+  insert into public.failed_words (user_id, word_id, last_seen, times_seen, from_quiz, from_flashcard)
+  values (
+    auth.uid(),
+    p_word_id,
+    now(),
+    1,
+    (p_source = 'quiz'),
+    (p_source = 'flashcard')
+  )
   on conflict (user_id, word_id) do update
     set last_seen = excluded.last_seen,
-        times_seen = failed_words.times_seen + 1;
+        times_seen = failed_words.times_seen + 1,
+        from_quiz = (failed_words.from_quiz or excluded.from_quiz),
+        from_flashcard = (failed_words.from_flashcard or excluded.from_flashcard);
 
   update public.profiles
   set first_played_at = coalesce(first_played_at, now())
@@ -152,8 +226,20 @@ begin
 end;
 $$;
 
+-- Backwards-compatible wrapper used by older clients.
+create or replace function public.touch_failed_word(p_word_id bigint)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  select public.touch_failed_word(p_word_id, 'quiz');
+$$;
+
 revoke all on function public.touch_failed_word(bigint) from public;
+revoke all on function public.touch_failed_word(bigint, text) from public;
 grant execute on function public.touch_failed_word(bigint) to authenticated;
+grant execute on function public.touch_failed_word(bigint, text) to authenticated;
 
 -- 3a) Per-word consecutive correct (for downweighting “mastered” words in random draw)
 create table if not exists public.user_word_streaks (

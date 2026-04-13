@@ -32,8 +32,8 @@ function sortReviewRows(rows: ReviewListRow[], sortBy: ReviewSortKey): ReviewLis
 
 function reviewRowClass(timesSeen: number): string {
   const base = "border-t border-zinc-200 transition-colors";
-  if (timesSeen > 5) return `${base} bg-orange-50`;
-  if (timesSeen > 3) return `${base} bg-red-50`;
+  if (timesSeen > 5) return `${base} bg-red-50`;
+  if (timesSeen > 3) return `${base} bg-orange-50`;
   if (timesSeen > 1) return `${base} bg-yellow-50`;
   return `${base} bg-white`;
 }
