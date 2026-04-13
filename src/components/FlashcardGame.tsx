@@ -548,9 +548,9 @@ export function FlashcardGame({
       void (async () => {
         try {
           if (result === "correct") {
-            await removeFailedWord(word.id);
+          await removeFailedWord(word.id);
           } else {
-            await upsertFailedWord(word.id);
+          await upsertFailedWord(word.id, "quiz");
           }
           onReviewChange?.();
         } catch {
@@ -617,7 +617,7 @@ export function FlashcardGame({
 
     void (async () => {
       try {
-        await upsertFailedWord(word.id);
+        await upsertFailedWord(word.id, "quiz");
         onReviewChange?.();
       } catch {
         /* ignore */

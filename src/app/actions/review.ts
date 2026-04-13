@@ -5,7 +5,7 @@ import { isMissingDbObjectError } from "@/lib/supabaseMissingSchema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 
-export async function upsertFailedWord(wordId: number) {
+export async function upsertFailedWord(wordId: number, source: "quiz" | "flashcard" = "quiz") {
   await assertNotSuperadminPlay();
   const supabase = await createSupabaseServerClient();
   const {
@@ -15,7 +15,7 @@ export async function upsertFailedWord(wordId: number) {
   if (userError) throw userError;
   if (!user) throw new Error("Not authenticated");
 
-  const { error: rpcError } = await supabase.rpc("touch_failed_word", { p_word_id: wordId });
+  const { error: rpcError } = await supabase.rpc("touch_failed_word", { p_word_id: wordId, p_source: source });
   if (!rpcError) return;
 
   if (!isMissingDbObjectError(rpcError)) throw rpcError;
@@ -25,6 +25,8 @@ export async function upsertFailedWord(wordId: number) {
       user_id: user.id,
       word_id: wordId,
       last_seen: new Date().toISOString(),
+      from_quiz: source === "quiz",
+      from_flashcard: source === "flashcard",
     },
     { onConflict: "user_id,word_id" },
   );

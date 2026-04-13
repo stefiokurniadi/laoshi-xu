@@ -14,6 +14,7 @@ import type { MasteryDownweightConfig } from "@/lib/wordSelection";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const nextMode = parseQuestionMode(searchParams.get("mode"));
+  const pointsSource = searchParams.get("points") === "flashcard" ? "flashcard" : "quiz";
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -39,13 +40,18 @@ export async function GET(request: Request) {
   } = { ...pickerBase };
 
   if (user) {
-    const [profileRes, failedCount, masteryConfig] = await Promise.all([
-      supabase.from("profiles").select("total_points").eq("id", user.id).maybeSingle(),
+    const pointsPromise =
+      pointsSource === "flashcard"
+        ? supabase.from("flashcard_points").select("total_points").eq("user_id", user.id).maybeSingle()
+        : supabase.from("profiles").select("total_points").eq("id", user.id).maybeSingle();
+
+    const [pointsRes, failedCount, masteryConfig] = await Promise.all([
+      pointsPromise,
       countFailedWordsForUser(supabase, user.id),
       getMasteryDownweightConfig(supabase),
     ]);
 
-    const points = profileRes.data?.total_points ?? 0;
+    const points = pointsRes.data?.total_points ?? 0;
     if (points < 25) maxLevel = 2;
     else if (points < 100) maxLevel = 4;
     else if (points < 500) maxLevel = 6;

@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { BrandLogo } from "@/components/BrandLogo";
 import {
@@ -13,6 +13,7 @@ import {
   signUpWithEmail,
 } from "@/app/actions/auth";
 import { HONEYPOT_FIELD } from "@/lib/honeypotConstants";
+import { safeInternalPath } from "@/lib/safeRedirect";
 
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -99,13 +100,7 @@ function AuthNoticeToast({
   );
 }
 
-export function AuthCard({
-  authError,
-  authNotice,
-  resendEmail,
-  verifyExpired = false,
-  showGoogleLogin = true,
-}: {
+type AuthCardProps = {
   authError?: string | null;
   authNotice?: string | null;
   resendEmail?: string | null;
@@ -113,9 +108,19 @@ export function AuthCard({
   verifyExpired?: boolean;
   /** Controlled by `app_settings.google_login_enabled` (see `/tiniwinibiti`). */
   showGoogleLogin?: boolean;
-}) {
+};
+
+function AuthCardInner({
+  authError,
+  authNotice,
+  resendEmail,
+  verifyExpired = false,
+  showGoogleLogin = true,
+}: AuthCardProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const nextAfterSignIn = safeInternalPath(searchParams.get("next")) ?? "";
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [localError, setLocalError] = useState<string | null>(null);
   const [showNotice, setShowNotice] = useState(Boolean(authNotice));
@@ -237,6 +242,7 @@ export function AuthCard({
           }}
         >
           <HoneypotField />
+          <input type="hidden" name="next" value={nextAfterSignIn} />
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-500">Email</label>
             <input
@@ -338,5 +344,20 @@ export function AuthCard({
         ) : null}
       </div>
     </>
+  );
+}
+
+export function AuthCard(props: AuthCardProps) {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="mx-auto min-h-[28rem] w-full max-w-sm animate-pulse rounded-2xl border border-zinc-200 bg-zinc-100 sm:max-w-md"
+          aria-hidden
+        />
+      }
+    >
+      <AuthCardInner {...props} />
+    </Suspense>
   );
 }

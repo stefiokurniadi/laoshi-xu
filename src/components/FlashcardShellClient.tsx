@@ -42,6 +42,13 @@ export function FlashcardShellClient({
         score={score}
         scoreDelta={delta}
         leaderboardUserId={userId}
+        modeSwitcher={{
+          currentLabel: "Quiz Mode",
+          options: [
+            { href: "/", label: "Quiz Mode" },
+            { href: "/flashcard", label: "Flashcard Mode" },
+          ],
+        }}
       />
 
       <div className="relative z-0 mx-auto w-full max-w-6xl min-h-0 flex-1 px-5 py-6">

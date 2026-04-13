@@ -1,6 +1,16 @@
 "use client";
 
-import { ChevronDown, KeyRound, LogIn, LogOut, UserRound, X } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  KeyRound,
+  LogIn,
+  LogOut,
+  Trophy,
+  UserRound,
+  X,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +30,10 @@ export function Navbar({
   scoreDelta,
   loginHref,
   leaderboardUserId,
+  pointLabelOverride,
+  hideScore = false,
+  hideRating = false,
+  modeSwitcher,
 }: {
   email?: string | null;
   /** Server peak score; combined with live `score` so the menu stays accurate during play. */
@@ -30,6 +44,14 @@ export function Navbar({
   loginHref?: string;
   /** Logged-in home: show trophy-only leaderboard on small screens (next to Point). */
   leaderboardUserId?: string | null;
+  /** Override the default label (e.g. “Flashcard points:”). */
+  pointLabelOverride?: string;
+  /** Hide the points pill entirely (e.g. Flashcard 2.0). */
+  hideScore?: boolean;
+  /** Hide rating UI (top bar + profile menu) without changing auth state. */
+  hideRating?: boolean;
+  /** Header dropdown to switch between Quiz and Flashcard modes. */
+  modeSwitcher?: { currentLabel: string; options: { href: string; label: string }[] };
 }) {
   const deltaColor = scoreDelta == null ? null : scoreDelta > 0 ? "bg-emerald-500" : scoreDelta < 0 ? "bg-rose-500" : "bg-zinc-500";
   const deltaText = useMemo(() => {
@@ -47,7 +69,7 @@ export function Navbar({
     () => playerRatingLabel(peakPoints).replace(/^Rating:\s*/i, ""),
     [peakPoints],
   );
-  const pointLabel = email ? "Point:" : "Guest Point:";
+  const pointLabel = pointLabelOverride ?? (email ? "Point:" : "Guest Point:");
 
   const [accountOpen, setAccountOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -61,6 +83,8 @@ export function Navbar({
   const [pwKind, setPwKind] = useState<"set" | "change" | null>(null);
   const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const modeRef = useRef<HTMLDivElement | null>(null);
+  const [modeOpen, setModeOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -76,6 +100,17 @@ export function Navbar({
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
   }, [accountOpen]);
+
+  useEffect(() => {
+    if (!modeOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (modeRef.current && !modeRef.current.contains(t)) setModeOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [modeOpen]);
 
   const openChangePassword = useCallback(() => {
     setAccountOpen(false);
@@ -173,7 +208,7 @@ export function Navbar({
               Dev
             </span>
           ) : null}
-          {email ? (
+          {email && !hideRating ? (
             <div className="flex min-w-0 flex-col items-start text-left sm:hidden">
               <span
                 className="block max-w-[min(52vw,11rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
@@ -210,7 +245,7 @@ export function Navbar({
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-          {email ? (
+          {email && !hideRating ? (
             <div className="hidden min-w-0 shrink flex-col items-end text-right sm:flex">
               <span
                 className="block max-w-[min(46vw,12rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
@@ -227,31 +262,83 @@ export function Navbar({
             </div>
           ) : null}
 
-          <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-2.5 text-sm font-medium text-zinc-700 shadow-sm sm:gap-2 sm:px-4">
-            <span className="font-semibold text-zinc-600">{pointLabel}</span>
-            <motion.span
-              key={score}
-              initial={{ scale: 1 }}
-              animate={{ scale: [1, 1.15, 1] }}
-              transition={{ duration: 0.35 }}
-              className="font-semibold tabular-nums text-[#1a5156]"
-            >
-              {score}
-            </motion.span>
-            <AnimatePresence>
-              {deltaText && (
-                <motion.span
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold text-white ${deltaColor}`}
-                >
-                  {deltaText}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </div>
+          {hideScore ? null : (
+            <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-2.5 text-sm font-medium text-zinc-700 shadow-sm sm:gap-2 sm:px-4">
+              <span className="font-semibold text-zinc-600">{pointLabel}</span>
+              <motion.span
+                key={score}
+                initial={{ scale: 1 }}
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 0.35 }}
+                className="font-semibold tabular-nums text-[#1a5156]"
+              >
+                {score}
+              </motion.span>
+              <AnimatePresence>
+                {deltaText && (
+                  <motion.span
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.18 }}
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold text-white ${deltaColor}`}
+                  >
+                    {deltaText}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {modeSwitcher ? (
+            <div className="relative" ref={modeRef}>
+              <button
+                type="button"
+                onClick={() => setModeOpen((v) => !v)}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#1a5156] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#164448]"
+                aria-haspopup="menu"
+                aria-expanded={modeOpen}
+              >
+                {modeSwitcher.currentLabel}
+                <ChevronDown className="h-4 w-4 text-white/80" aria-hidden />
+              </button>
+
+              <AnimatePresence>
+                {modeOpen ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.14 }}
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg"
+                    role="menu"
+                  >
+                    {modeSwitcher.options.map((opt) => {
+                      const active = opt.label === modeSwitcher.currentLabel;
+                      return (
+                        <Link
+                          key={opt.href}
+                          href={opt.href}
+                          onClick={() => setModeOpen(false)}
+                          aria-current={active ? "page" : undefined}
+                          className={`flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium ${
+                            active
+                              ? "bg-[#e8f3f4] text-[#123a3e]"
+                              : "text-zinc-900 hover:bg-zinc-50"
+                          }`}
+                          role="menuitem"
+                          tabIndex={active ? -1 : 0}
+                        >
+                          <span className="flex-1">{opt.label}</span>
+                          {active ? <Check className="h-4 w-4 text-[#1a5156]" aria-hidden /> : null}
+                        </Link>
+                      );
+                    })}
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          ) : null}
 
           {email && leaderboardUserId ? (
             <div className="sm:hidden">
@@ -287,33 +374,60 @@ export function Navbar({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.98 }}
                     transition={{ duration: 0.14 }}
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-xl shadow-zinc-900/10 ring-1 ring-black/5"
                     role="menu"
                   >
-                    <div className="px-4 py-3">
-                      <div
-                        className="w-full truncate text-sm font-medium text-zinc-700"
-                        title={email ?? ""}
-                      >
-                        {email}
-                      </div>
-                      <div className="mt-2 border-t border-zinc-100 pt-2">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                          Highest ever rating
-                        </div>
+                    <div className="bg-gradient-to-br from-[#e8f3f4] via-[#eef6f7] to-[#f0f6f7] px-4 pb-4 pt-4">
+                      <div className="flex items-start gap-3">
                         <div
-                          className="mt-0.5 truncate text-xs font-medium text-zinc-800"
-                          title={peakRatingShort}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1a5156]/12 ring-1 ring-[#1a5156]/15"
+                          aria-hidden
                         >
-                          {peakRatingShort}
+                          <UserRound className="h-5 w-5 text-[#164448]" strokeWidth={2} />
                         </div>
-                        <div className="mt-0.5 text-[10px] tabular-nums text-zinc-500">
-                          Peak score: {peakPoints}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+                            Signed in as
+                          </p>
+                          <p
+                            className="mt-1 break-words text-sm font-semibold leading-snug tracking-tight text-zinc-900"
+                            title={email ?? ""}
+                          >
+                            {email}
+                          </p>
+                          {hideRating ? null : (
+                            <div className="mt-3 rounded-xl border border-[#1a5156]/12 bg-white/90 px-3 py-3 shadow-sm ring-1 ring-zinc-100">
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#1a5156]">
+                                <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-600" strokeWidth={2.5} aria-hidden />
+                                Highest ever rating
+                              </div>
+                              <p
+                                className="mt-2 truncate text-lg font-bold leading-tight text-[#123a3e]"
+                                title={peakRatingShort}
+                              >
+                                {peakRatingShort}
+                              </p>
+                              <p className="mt-1.5 text-xs tabular-nums text-zinc-600">
+                                Peak score:{" "}
+                                <span className="font-bold tabular-nums text-[#1a5156]">{peakPoints}</span>
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="h-px bg-zinc-100" />
+                    <div className="h-px bg-zinc-200/90" />
+
+                    <Link
+                      href="/my-learning"
+                      onClick={() => setAccountOpen(false)}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                      role="menuitem"
+                    >
+                      <BookOpen className="h-4 w-4 text-zinc-500" />
+                      My Learning
+                    </Link>
 
                     <button
                       type="button"
