@@ -5,15 +5,21 @@ import { Flashcard2ShellClient } from "@/components/Flashcard2ShellClient";
 export async function Flashcard2Shell({
   email,
   userId,
+  quizScore,
+  quizHighestPoints,
 }: {
   email: string;
   userId: string;
+  quizScore: number;
+  quizHighestPoints: number;
 }) {
   const [initialRows, initialPoints] = await Promise.all([getFailedWords(), getFlashcardPoints()]);
   return (
     <Flashcard2ShellClient
       email={email}
       userId={userId}
+      quizScore={quizScore}
+      quizHighestPoints={quizHighestPoints}
       initialFlashcardPoints={initialPoints}
       initialReviewRows={initialRows.map((r) => ({
         last_seen: r.last_seen,

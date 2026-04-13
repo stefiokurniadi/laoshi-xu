@@ -47,6 +47,7 @@ export function FlashcardShellClient({
           options: [
             { href: "/", label: "Quiz Mode" },
             { href: "/flashcard", label: "Flashcard Mode" },
+            { href: "/my-learning", label: "Learning Mode" },
           ],
         }}
       />

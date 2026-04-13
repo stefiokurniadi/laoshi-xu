@@ -27,7 +27,12 @@ export default async function Flashcard2Page() {
 
   return (
     <main id="main-content" className="flex min-h-0 flex-1 flex-col">
-      <Flashcard2Shell email={profile.email ?? user.email ?? ""} userId={profile.id} />
+      <Flashcard2Shell
+        email={profile.email ?? user.email ?? ""}
+        userId={profile.id}
+        quizScore={profile.total_points ?? 0}
+        quizHighestPoints={profile.highest_points ?? 0}
+      />
     </main>
   );
 }

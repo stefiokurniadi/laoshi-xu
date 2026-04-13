@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BookOpen,
   Check,
   ChevronDown,
   KeyRound,
@@ -32,7 +31,7 @@ export function Navbar({
   leaderboardUserId,
   pointLabelOverride,
   hideScore = false,
-  hideRating = false,
+  hideTopRating = false,
   modeSwitcher,
 }: {
   email?: string | null;
@@ -48,8 +47,8 @@ export function Navbar({
   pointLabelOverride?: string;
   /** Hide the points pill entirely (e.g. Flashcard 2.0). */
   hideScore?: boolean;
-  /** Hide rating UI (top bar + profile menu) without changing auth state. */
-  hideRating?: boolean;
+  /** Hide top-bar rating UI (keeps profile menu stats). */
+  hideTopRating?: boolean;
   /** Header dropdown to switch between Quiz and Flashcard modes. */
   modeSwitcher?: { currentLabel: string; options: { href: string; label: string }[] };
 }) {
@@ -208,7 +207,7 @@ export function Navbar({
               Dev
             </span>
           ) : null}
-          {email && !hideRating ? (
+          {email && !hideTopRating ? (
             <div className="flex min-w-0 flex-col items-start text-left sm:hidden">
               <span
                 className="block max-w-[min(52vw,11rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
@@ -245,7 +244,7 @@ export function Navbar({
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-          {email && !hideRating ? (
+          {email && !hideTopRating ? (
             <div className="hidden min-w-0 shrink flex-col items-end text-right sm:flex">
               <span
                 className="block max-w-[min(46vw,12rem)] truncate text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
@@ -321,10 +320,10 @@ export function Navbar({
                           href={opt.href}
                           onClick={() => setModeOpen(false)}
                           aria-current={active ? "page" : undefined}
-                          className={`flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium ${
+                          className={`flex w-full items-center gap-2 px-4 py-3 text-left text-sm ${
                             active
-                              ? "bg-[#e8f3f4] text-[#123a3e]"
-                              : "text-zinc-900 hover:bg-zinc-50"
+                              ? "bg-[#e8f3f4] font-semibold text-[#123a3e]"
+                              : "font-medium text-zinc-900 hover:bg-zinc-50"
                           }`}
                           role="menuitem"
                           tabIndex={active ? -1 : 0}
@@ -395,39 +394,27 @@ export function Navbar({
                           >
                             {email}
                           </p>
-                          {hideRating ? null : (
-                            <div className="mt-3 rounded-xl border border-[#1a5156]/12 bg-white/90 px-3 py-3 shadow-sm ring-1 ring-zinc-100">
-                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#1a5156]">
-                                <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-600" strokeWidth={2.5} aria-hidden />
-                                Highest ever rating
-                              </div>
-                              <p
-                                className="mt-2 truncate text-lg font-bold leading-tight text-[#123a3e]"
-                                title={peakRatingShort}
-                              >
-                                {peakRatingShort}
-                              </p>
-                              <p className="mt-1.5 text-xs tabular-nums text-zinc-600">
-                                Peak score:{" "}
-                                <span className="font-bold tabular-nums text-[#1a5156]">{peakPoints}</span>
-                              </p>
+                          <div className="mt-3 rounded-xl border border-[#1a5156]/12 bg-white/90 px-3 py-3 shadow-sm ring-1 ring-zinc-100">
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#1a5156]">
+                              <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-600" strokeWidth={2.5} aria-hidden />
+                              Highest ever rating
                             </div>
-                          )}
+                            <p
+                              className="mt-2 truncate text-lg font-bold leading-tight text-[#123a3e]"
+                              title={peakRatingShort}
+                            >
+                              {peakRatingShort}
+                            </p>
+                            <p className="mt-1.5 text-xs tabular-nums text-zinc-600">
+                              Peak score:{" "}
+                              <span className="font-bold tabular-nums text-[#1a5156]">{peakPoints}</span>
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="h-px bg-zinc-200/90" />
-
-                    <Link
-                      href="/my-learning"
-                      onClick={() => setAccountOpen(false)}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-zinc-900 hover:bg-zinc-50"
-                      role="menuitem"
-                    >
-                      <BookOpen className="h-4 w-4 text-zinc-500" />
-                      My Learning
-                    </Link>
 
                     <button
                       type="button"

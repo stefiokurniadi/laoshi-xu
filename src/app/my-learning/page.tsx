@@ -27,15 +27,19 @@ export default async function MyLearningPage() {
       highestPoints={peak}
       score={profile.total_points ?? 0}
       userId={profile.id}
+      hideTopRating
+      hideScore
+      modeSwitcher={{
+        currentLabel: "Learning Mode",
+        options: [
+          { href: "/", label: "Quiz Mode" },
+          { href: "/flashcard", label: "Flashcard Mode" },
+          { href: "/my-learning", label: "Learning Mode" },
+        ],
+      }}
     >
       <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-5 py-8 sm:py-10">
         <div className="mb-8">
-          <Link
-            href="/"
-            className="text-sm font-medium text-[#1a5156] underline underline-offset-2 hover:text-[#164448]"
-          >
-            ← Back to flashcards
-          </Link>
           <h1 className="mt-4 flex items-center gap-2 text-2xl font-bold tracking-tight text-zinc-900">
             <BookOpen className="h-8 w-8 shrink-0 text-[#1a5156]" aria-hidden />
             My Learning
