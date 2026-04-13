@@ -84,6 +84,7 @@ export function Navbar({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const modeRef = useRef<HTMLDivElement | null>(null);
   const [modeOpen, setModeOpen] = useState(false);
+  const modeLabelMobile = useMemo(() => modeSwitcher?.currentLabel.replace(/\s+Mode\s*$/i, "") ?? null, [modeSwitcher]);
 
   useEffect(() => {
     setMounted(true);
@@ -223,6 +224,15 @@ export function Navbar({
               </span>
             </div>
           ) : null}
+          {!email ? (
+            <Link
+              href="/"
+              aria-label="Home"
+              className="sm:hidden rounded-full outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2"
+            >
+              <BrandLogo className="h-10 w-10 rounded-full object-cover ring-1 ring-zinc-200/80" />
+            </Link>
+          ) : null}
           <Link
             href="/"
             aria-label="Home"
@@ -263,7 +273,10 @@ export function Navbar({
 
           {hideScore ? null : (
             <div className="inline-flex h-10 max-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-2.5 text-sm font-medium text-zinc-700 shadow-sm sm:gap-2 sm:px-4">
-              <span className="font-semibold text-zinc-600">{pointLabel}</span>
+              <span className="hidden font-semibold text-zinc-600 sm:inline">{pointLabel}</span>
+              <span className="font-semibold text-zinc-600 sm:hidden" aria-hidden>
+                🎯
+              </span>
               <motion.span
                 key={score}
                 initial={{ scale: 1 }}
@@ -298,7 +311,8 @@ export function Navbar({
                 aria-haspopup="menu"
                 aria-expanded={modeOpen}
               >
-                {modeSwitcher.currentLabel}
+                <span className="font-semibold sm:hidden">{modeLabelMobile ?? modeSwitcher.currentLabel}</span>
+                <span className="hidden sm:inline font-semibold">{modeSwitcher.currentLabel}</span>
                 <ChevronDown className="h-4 w-4 text-white/80" aria-hidden />
               </button>
 
@@ -339,11 +353,7 @@ export function Navbar({
             </div>
           ) : null}
 
-          {email && leaderboardUserId ? (
-            <div className="sm:hidden">
-              <LeaderboardLauncher userId={leaderboardUserId} variant="icon" />
-            </div>
-          ) : null}
+          {/* Mobile leaderboard button moved into My profile menu */}
 
           {email ? (
             <GeminiAdviseLauncher />
@@ -416,6 +426,14 @@ export function Navbar({
 
                     <div className="h-px bg-zinc-200/90" />
 
+                    {email && leaderboardUserId ? (
+                      <div className="px-4 py-3">
+                        <LeaderboardLauncher userId={leaderboardUserId} variant="default" />
+                      </div>
+                    ) : null}
+
+                    <div className="h-px bg-zinc-100" />
+
                     <button
                       type="button"
                       onClick={openChangePassword}
@@ -445,10 +463,10 @@ export function Navbar({
           ) : loginHref ? (
             <Link
               href={loginHref}
-              className="inline-flex aspect-square h-10 w-10 min-h-10 min-w-10 max-h-10 max-w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-[#1a5156] p-0 text-white shadow-sm hover:bg-[#164448] sm:aspect-auto sm:h-10 sm:max-h-none sm:max-w-none sm:min-h-10 sm:min-w-0 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-black/10 bg-[#1a5156] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#164448] sm:h-10 sm:px-4 sm:text-sm sm:font-medium"
             >
-              <LogIn className="h-[1.125rem] w-[1.125rem] shrink-0 sm:hidden" strokeWidth={2} aria-hidden />
-              <span className="hidden sm:inline font-semibold">Login for Free</span>
+              <LogIn className="h-[1.125rem] w-[1.125rem] shrink-0" strokeWidth={2} aria-hidden />
+              <span className="font-semibold">Login</span>
             </Link>
           ) : null}
         </div>
