@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 const siteUrl = getSiteUrl();
 const siteTitle = "FREE Mandarin HSK Flashcards";
 const siteDescription =
-  "Practice Chinese vocabulary with HSK-level flashcards, multiple-choice modes, a leaderboard, and a personal review list for words you miss.";
+  "Free Mandarin practice with Chinese flashcards and quizzes. Learn HSK vocabulary with a Mandarin flashcard mode, a Mandarin quiz mode, and a personal review list.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -30,12 +30,25 @@ export const metadata: Metadata = {
   },
   description: siteDescription,
   keywords: [
+    "mandarin practice",
+    "mandarin lesson",
+    "mandarin flashcard",
+    "mandarin quiz",
+    "free mandarin",
+    "chinese practice",
+    "chinese lesson",
+    "chinese flashcard",
+    "chinese quiz",
+    "free chinese",
     "Mandarin",
     "Chinese",
     "HSK",
     "flashcards",
+    "quizzes",
+    "learn Mandarin",
     "learn Chinese",
-    "vocabulary",
+    "Chinese vocabulary",
+    "Mandarin vocabulary",
     "Laoshi Xu",
   ],
   authors: [{ name: "Laoshi Xu" }],

@@ -31,6 +31,16 @@ export default async function MyLearningGrammarPage() {
       highestPoints={peak}
       score={profile.total_points ?? 0}
       userId={profile.id}
+      hideTopRating
+      hideScore
+      modeSwitcher={{
+        currentLabel: "Learning Mode",
+        options: [
+          { href: "/", label: "Quiz Mode" },
+          { href: "/flashcard", label: "Flashcard Mode" },
+          { href: "/my-learning", label: "Learning Mode" },
+        ],
+      }}
     >
       <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-5 py-8 sm:py-10">
         <nav className="mb-6 text-sm">

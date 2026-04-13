@@ -9,11 +9,15 @@ import { Flashcard2Game } from "@/components/Flashcard2Game";
 export function Flashcard2ShellClient({
   email,
   userId,
+  quizScore,
+  quizHighestPoints,
   initialFlashcardPoints,
   initialReviewRows,
 }: {
   email: string;
   userId: string;
+  quizScore: number;
+  quizHighestPoints: number;
   initialFlashcardPoints: number;
   initialReviewRows: ReviewListRow[];
 }) {
@@ -24,22 +28,25 @@ export function Flashcard2ShellClient({
     setPoints(initialFlashcardPoints);
   }, [initialFlashcardPoints]);
 
+  const quizPeak = Math.max(quizHighestPoints, quizScore);
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-[#f0f6f7]">
       <Navbar
         email={email}
-        highestPoints={points}
-        score={points}
+        highestPoints={quizPeak}
+        score={quizScore}
         scoreDelta={null}
         leaderboardUserId={null}
         pointLabelOverride="Flashcard points:"
         hideScore
-        hideRating
+        hideTopRating
         modeSwitcher={{
           currentLabel: "Flashcard Mode",
           options: [
             { href: "/", label: "Quiz Mode" },
             { href: "/flashcard", label: "Flashcard Mode" },
+            { href: "/my-learning", label: "Learning Mode" },
           ],
         }}
       />

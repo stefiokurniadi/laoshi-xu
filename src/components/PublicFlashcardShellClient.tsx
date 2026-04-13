@@ -28,9 +28,13 @@ export function PublicFlashcardShellClient({ ttsVoicePreset }: { ttsVoicePreset:
 
       <div className="relative z-0 mx-auto flex w-full max-w-6xl flex-1 flex-col items-center px-5 py-8">
         <div className="mb-6 w-full text-center sm:mb-8">
-          <div className="text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
-            FREE Mandarin Flashcard: Gain Points & Increase Your HSK Level
-          </div>
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
+            Free Mandarin practice with flashcards and quizzes
+          </h1>
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
+            Practice Chinese vocabulary daily with a Mandarin flashcard flow and a Mandarin quiz mode. Study by HSK level
+            and review the words you miss.
+          </p>
         </div>
 
         <div className="w-full max-w-2xl">

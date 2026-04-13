@@ -7,12 +7,18 @@ export function SignedInAppChrome({
   highestPoints,
   score,
   userId,
+  hideTopRating = false,
+  hideScore = false,
+  modeSwitcher,
   children,
 }: {
   email: string;
   highestPoints: number;
   score: number;
   userId: string;
+  hideTopRating?: boolean;
+  hideScore?: boolean;
+  modeSwitcher?: { currentLabel: string; options: { href: string; label: string }[] };
   children: React.ReactNode;
 }) {
   return (
@@ -23,6 +29,9 @@ export function SignedInAppChrome({
         score={score}
         scoreDelta={null}
         leaderboardUserId={userId}
+        hideTopRating={hideTopRating}
+        hideScore={hideScore}
+        modeSwitcher={modeSwitcher}
       />
       {children}
     </div>
