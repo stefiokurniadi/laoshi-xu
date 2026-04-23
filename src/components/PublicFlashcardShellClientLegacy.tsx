@@ -1,12 +1,21 @@
 "use client";
 
+/**
+ * Original narrow guest homepage (centered hero + demo API only).
+ * Kept for revert / QA — also routed at `/guest-quiz-demo`.
+ */
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
-import { FlashcardGame } from "@/components/FlashcardGame";
+import { FlashcardGameSkeleton } from "@/components/FlashcardGameSkeleton";
 import { GUEST_DEMO_SCORE_KEY } from "@/lib/guestDemo";
-import type { TtsVoicePreset } from "@/lib/ttsVoice";
 
-export function PublicFlashcardShellClient({ ttsVoicePreset }: { ttsVoicePreset: TtsVoicePreset }) {
+const FlashcardGame = dynamic(
+  () => import("@/components/FlashcardGame").then((m) => ({ default: m.FlashcardGame })),
+  { loading: () => <FlashcardGameSkeleton />, ssr: true },
+);
+
+export function PublicFlashcardShellClientLegacy() {
   const [score, setScore] = useState(0);
   const [delta, setDelta] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -41,7 +50,6 @@ export function PublicFlashcardShellClient({ ttsVoicePreset }: { ttsVoicePreset:
           <FlashcardGame
             demo={{ fetchPath: "/api/word/demo" }}
             initialScore={score}
-            ttsVoicePreset={ttsVoicePreset}
             onScoreChange={(nextScore, d) => {
               setScore(nextScore);
               setDelta(d);

@@ -39,10 +39,13 @@ function reviewRowClass(timesSeen: number): string {
 }
 
 export function ReviewList({
+  guestMode = false,
   initialRows,
   userId,
   refreshEpoch = 0,
 }: {
+  /** Skip Supabase sync; show sign-in hint when empty. */
+  guestMode?: boolean;
   initialRows: ReviewListRow[];
   userId: string;
   /** Incremented after add/remove review rows so the table refetches immediately. */
@@ -117,6 +120,7 @@ export function ReviewList({
   }, [supabase, userId]);
 
   useEffect(() => {
+    if (guestMode) return;
     const channel = supabase
       .channel(`failed_words:${userId}`)
       .on(
@@ -131,15 +135,21 @@ export function ReviewList({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [refetch, supabase, userId]);
+  }, [guestMode, refetch, supabase, userId]);
 
   useEffect(() => {
+    if (!guestMode) return;
+    setRows(initialRows);
+  }, [guestMode, initialRows]);
+
+  useEffect(() => {
+    if (guestMode) return;
     if (refreshEpoch < 1) return;
     const t = window.setTimeout(() => {
       void refetch();
     }, 0);
     return () => clearTimeout(t);
-  }, [refreshEpoch, refetch]);
+  }, [guestMode, refreshEpoch, refetch]);
 
   useLayoutEffect(() => {
     syncScrollHint();
@@ -168,7 +178,9 @@ export function ReviewList({
         <div className="min-w-0">
           <div className="text-sm font-semibold text-zinc-900">Review List</div>
           <div className="text-xs text-zinc-500">
-            Words you missed or skipped.
+            {guestMode
+              ? "Words you miss are saved on this device only. Sign in to sync to your account."
+              : "Words you missed or skipped."}
           </div>
         </div>
         <div className="relative inline-flex h-8 w-max max-w-[min(100%,8.25rem)] shrink-0 items-center justify-between gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2 py-1 text-zinc-500 focus-within:ring-2 focus-within:ring-zinc-300/40 focus-within:ring-offset-0 sm:max-w-[9rem]">
@@ -216,7 +228,9 @@ export function ReviewList({
               {sortedRows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-3 py-6 text-center text-zinc-500">
-                    Nothing here yet. Keep going.
+                    {guestMode
+                      ? "Nothing here yet. Miss a word in the quiz or flashcard to add it."
+                      : "Nothing here yet. Keep going."}
                   </td>
                 </tr>
               ) : (

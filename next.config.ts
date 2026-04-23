@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 /** Apex → www so SEO and analytics see one canonical host (matches NEXT_PUBLIC_SITE_URL in prod). */
 const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "@vercel/analytics", "@vercel/speed-insights"],
+  },
   async redirects() {
     return [
       {

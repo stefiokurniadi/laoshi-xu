@@ -3,6 +3,7 @@
 import { assertNotSuperadminPlay } from "@/lib/assertNotSuperadminPlay";
 import type { QuestionMode } from "@/lib/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isMissingSessionAuthError } from "@/lib/supabaseAuthSession";
 
 export async function ensureProfile() {
   const supabase = await createSupabaseServerClient();
@@ -10,7 +11,10 @@ export async function ensureProfile() {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
-  if (userError) throw userError;
+  if (userError) {
+    if (isMissingSessionAuthError(userError)) return null;
+    throw userError;
+  }
   if (!user) return null;
 
   const { data: existing, error: selectError } = await supabase

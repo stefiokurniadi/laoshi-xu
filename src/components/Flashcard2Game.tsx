@@ -1,17 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { HskWord, Option, QuestionMode } from "@/lib/types";
+import type { HskWord, Option, QuestionMode, WordGameApiPayload } from "@/lib/types";
 import { buildOptions, getAnswerText, getPrompt, rotateMode, scoreDelta } from "@/lib/game";
 import { incrementFlashcardPoints } from "@/app/actions/flashcardPoints";
+import { removeGuestFailedWord, touchGuestFailedWord } from "@/lib/guestReviewList";
 import { incrementPoints } from "@/app/actions/profile";
 import { upsertFailedWord } from "@/app/actions/review";
 
-type ApiPayload = { word: HskWord; distractors: HskWord[]; source: "hsk" | "review" | "demo" };
-
 const POST_REVEAL_TO_NEXT_MS = 1400;
 const PREFETCH_DEPTH = 3;
-type PrefetchSlot = { requestMode: QuestionMode; promise: Promise<ApiPayload> };
+type PrefetchSlot = { requestMode: QuestionMode; promise: Promise<WordGameApiPayload> };
 
 function primaryAnswerLabelForMode(mode: QuestionMode): "Hanzi" | "English" {
   // The "main answer" field the user is expected to recall for the prompt.
@@ -22,20 +22,30 @@ function primaryAnswerLabelForMode(mode: QuestionMode): "Hanzi" | "English" {
 }
 
 export function Flashcard2Game({
+  guestMode = false,
   userId,
   initialFlashcardPoints,
+  initialPayload = null,
+  initialMode = null,
   onPointsChange,
   onReviewChange,
 }: {
+  /** Anonymous play: local-only points, no review DB writes. */
+  guestMode?: boolean;
   userId: string;
   initialFlashcardPoints: number;
+  /** First card from SSR so the client does not wait on /api/word for first paint. */
+  initialPayload?: WordGameApiPayload | null;
+  initialMode?: QuestionMode | null;
   onPointsChange: (next: number) => void;
   onReviewChange: () => void;
 }) {
   const roundStorageKey = useMemo(() => `laoshi-xu:flashcard2:round:${userId}`, [userId]);
-  const [mode, setMode] = useState<QuestionMode | null>(null);
-  const [word, setWord] = useState<HskWord | null>(null);
-  const [options, setOptions] = useState<Option[]>([]);
+  const [mode, setMode] = useState<QuestionMode | null>(() => initialMode ?? null);
+  const [word, setWord] = useState<HskWord | null>(() => initialPayload?.word ?? null);
+  const [options, setOptions] = useState<Option[]>(() =>
+    initialPayload ? buildOptions(initialPayload.word, initialPayload.distractors) : [],
+  );
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -98,14 +108,14 @@ export function Flashcard2Game({
     persistRound();
   }, [persistRound]);
 
-  const fetchPayloadForMode = useCallback(async (requestMode: QuestionMode): Promise<ApiPayload> => {
+  const fetchPayloadForMode = useCallback(async (requestMode: QuestionMode): Promise<WordGameApiPayload> => {
     const qs = new URLSearchParams({ mode: requestMode, points: "flashcard" });
     const res = await fetch(`/api/word?${qs.toString()}`, { cache: "no-store" });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? "Failed to fetch word");
     }
-    return (await res.json()) as ApiPayload;
+    return (await res.json()) as WordGameApiPayload;
   }, []);
 
   const topUpPrefetchQueue = useCallback(
@@ -162,6 +172,10 @@ export function Flashcard2Game({
 
   useEffect(() => {
     if (restoreRound()) return;
+    if (initialPayload && initialMode) {
+      topUpPrefetchQueue(initialMode);
+      return;
+    }
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -195,6 +209,7 @@ export function Flashcard2Game({
       const optimistic = pointsRef.current + delta;
       pointsRef.current = optimistic;
       onPointsChange(optimistic);
+      if (guestMode) return;
       try {
         const next = await incrementFlashcardPoints(delta);
         if (next !== pointsRef.current) {
@@ -205,7 +220,7 @@ export function Flashcard2Game({
         // Keep optimistic value; next refresh will reconcile.
       }
     },
-    [onPointsChange],
+    [guestMode, onPointsChange],
   );
 
   const onYesKnow = useCallback(async () => {
@@ -214,61 +229,71 @@ export function Flashcard2Game({
     setReveal({ correctId: word.id, pickedKey: "yes" });
     const delta = scoreDelta(word.level, "correct");
     void applyPointsDelta(delta);
-    void (async () => {
-      try {
-        await incrementPoints(0, mode);
-      } catch {
-        /* ignore */
-      }
-    })();
+    if (!guestMode) {
+      void (async () => {
+        try {
+          await incrementPoints(0, mode);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
     scheduleAdvance();
-  }, [applyPointsDelta, busy, mode, scheduleAdvance, word]);
+  }, [applyPointsDelta, busy, guestMode, mode, scheduleAdvance, word]);
 
   const onYesKnowPrimaryOnly = useCallback(async () => {
     if (!word || !mode || busy) return;
     setStage("reveal");
     setReveal({ correctId: word.id, pickedKey: "yesPrimaryOnly" });
     // Intentionally +0: user self-reports partial knowledge.
-    void (async () => {
-      try {
-        await incrementPoints(0, mode);
-      } catch {
-        /* ignore */
-      }
-    })();
+    if (!guestMode) {
+      void (async () => {
+        try {
+          await incrementPoints(0, mode);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
     scheduleAdvance();
-  }, [busy, mode, scheduleAdvance, word]);
+  }, [busy, guestMode, mode, scheduleAdvance, word]);
 
   const onYesKnowSecondaryOnly = useCallback(async () => {
     if (!word || !mode || busy) return;
     setStage("reveal");
     setReveal({ correctId: word.id, pickedKey: "yesSecondaryOnly" });
     // Intentionally +0: user self-reports partial knowledge.
-    void (async () => {
-      try {
-        await incrementPoints(0, mode);
-      } catch {
-        /* ignore */
-      }
-    })();
+    if (!guestMode) {
+      void (async () => {
+        try {
+          await incrementPoints(0, mode);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
     scheduleAdvance();
-  }, [busy, mode, scheduleAdvance, word]);
+  }, [busy, guestMode, mode, scheduleAdvance, word]);
 
   const onNoDontKnow = useCallback(async () => {
     if (!word || !mode || busy) return;
     setStage("mcq");
     setReveal({ correctId: word.id, pickedKey: "no" });
     setMcqAnswered(false);
-    // Immediately put it in the combined review list, tagged as flashcard.
-    void (async () => {
-      try {
-        await upsertFailedWord(word.id, "flashcard");
-        onReviewChange();
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, [busy, mode, onReviewChange, word]);
+    if (guestMode) {
+      touchGuestFailedWord(userId, word);
+      onReviewChange();
+    } else {
+      void (async () => {
+        try {
+          await upsertFailedWord(word.id, "flashcard");
+          onReviewChange();
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
+  }, [busy, guestMode, mode, onReviewChange, userId, word]);
 
   const onPickOption = useCallback(
     async (opt: Option) => {
@@ -283,16 +308,25 @@ export function Flashcard2Game({
 
       const delta = isCorrect ? 0 : scoreDelta(word.level, "wrong");
       void applyPointsDelta(delta);
-      void (async () => {
-        try {
-          await incrementPoints(0, mode);
-        } catch {
-          /* ignore */
+      if (guestMode) {
+        if (isCorrect) {
+          removeGuestFailedWord(userId, word.id);
+        } else {
+          touchGuestFailedWord(userId, word);
         }
-      })();
+        onReviewChange();
+      } else {
+        void (async () => {
+          try {
+            await incrementPoints(0, mode);
+          } catch {
+            /* ignore */
+          }
+        })();
+      }
       scheduleAdvance();
     },
-    [applyPointsDelta, busy, mcqAnswered, mode, scheduleAdvance, stage, word],
+    [applyPointsDelta, busy, guestMode, mcqAnswered, mode, onReviewChange, scheduleAdvance, stage, userId, word],
   );
 
   return (
@@ -301,6 +335,14 @@ export function Flashcard2Game({
         <div>
           <div className="text-lg font-semibold text-zinc-900">Flashcard Mode</div>
           <p className="mt-1 text-sm text-zinc-600">Self-check your chinese vocab</p>
+          {guestMode ? (
+            <p className="mt-2 text-xs text-zinc-500">
+              <Link href={`/login?next=${encodeURIComponent("/flashcard")}`} className="font-semibold text-[#1a5156] underline">
+                Sign in
+              </Link>{" "}
+              to save flashcard points and sync your review list to your account.
+            </p>
+          ) : null}
         </div>
       </div>
 

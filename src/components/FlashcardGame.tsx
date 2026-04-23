@@ -28,6 +28,8 @@ import {
   GUEST_DEMO_TRIALS_KEY,
   GUEST_DEMO_VOCAB_TIER_KEY,
 } from "@/lib/guestDemo";
+import { GUEST_HOME_QUIZ_SCORE_KEY } from "@/lib/guestHomeQuiz";
+import { removeGuestFailedWord, touchGuestFailedWord } from "@/lib/guestReviewList";
 import Link from "next/link";
 import { Volume2, VolumeX } from "lucide-react";
 import {
@@ -69,6 +71,7 @@ export function FlashcardGame({
   onScoreChange,
   onReviewChange,
   demo,
+  guestMode = false,
   ttsVoicePreset = "auto",
 }: {
   userId?: string;
@@ -78,6 +81,8 @@ export function FlashcardGame({
   onReviewChange?: () => void;
   /** Guest trial: local points only, separate word API, capped rounds. */
   demo?: { fetchPath: string };
+  /** Homepage-style guest: full `/api/word` quiz, no DB writes; score in localStorage. */
+  guestMode?: boolean;
   /** Global app setting: Mandarin speech synthesis voice preference. */
   ttsVoicePreset?: TtsVoicePreset;
 }) {
@@ -173,13 +178,17 @@ export function FlashcardGame({
       setIdkRemaining(0);
       return;
     }
+    if (guestMode) {
+      setIdkRemaining(getIdkRemainingLocal(userId!));
+      return;
+    }
     try {
       const r = await fetchIdkRemaining(localDateKey());
       setIdkRemaining(r);
     } catch {
       setIdkRemaining(getIdkRemainingLocal(userId!));
     }
-  }, [demo, userId]);
+  }, [demo, guestMode, userId]);
 
   useEffect(() => {
     void syncIdkFromServer();
@@ -405,7 +414,7 @@ export function FlashcardGame({
       }
       void syncIdkFromServer();
     },
-    [fetchPayloadForMode, mode, syncIdkFromServer, topUpPrefetchQueue],
+    [fetchPayloadForMode, guestMode, mode, syncIdkFromServer, topUpPrefetchQueue],
   );
 
   const startPrefetchAndScheduleAdvance = useCallback(() => {
@@ -539,6 +548,27 @@ export function FlashcardGame({
         return;
       }
 
+      if (guestMode) {
+        const optimisticNext = scoreRef.current + delta;
+        scoreRef.current = optimisticNext;
+        onScoreChange(optimisticNext, delta);
+        try {
+          window.localStorage.setItem(GUEST_HOME_QUIZ_SCORE_KEY, String(optimisticNext));
+        } catch {
+          /* ignore */
+        }
+        if (userId) {
+          if (result === "correct") {
+            removeGuestFailedWord(userId, word.id);
+          } else {
+            touchGuestFailedWord(userId, word);
+          }
+          onReviewChange?.();
+        }
+        startPrefetchAndScheduleAdvance();
+        return;
+      }
+
       const optimisticNext = scoreRef.current + delta;
       scoreRef.current = optimisticNext;
       onScoreChange(optimisticNext, delta);
@@ -548,9 +578,9 @@ export function FlashcardGame({
       void (async () => {
         try {
           if (result === "correct") {
-          await removeFailedWord(word.id);
+            await removeFailedWord(word.id);
           } else {
-          await upsertFailedWord(word.id, "quiz");
+            await upsertFailedWord(word.id, "quiz");
           }
           onReviewChange?.();
         } catch {
@@ -573,6 +603,7 @@ export function FlashcardGame({
     [
       busy,
       demo,
+      guestMode,
       mode,
       onReviewChange,
       onScoreChange,
@@ -581,6 +612,7 @@ export function FlashcardGame({
       speakCorrectAnswerHanzi,
       speechOk,
       startPrefetchAndScheduleAdvance,
+      userId,
       word,
     ],
   );
@@ -593,11 +625,16 @@ export function FlashcardGame({
 
     const date = localDateKey();
     let rem: number;
-    try {
-      rem = await consumeIdkQuota(date);
-    } catch {
+    if (guestMode) {
       if (!consumeIdkIfAllowedLocal(userId!)) return;
       rem = getIdkRemainingLocal(userId!);
+    } else {
+      try {
+        rem = await consumeIdkQuota(date);
+      } catch {
+        if (!consumeIdkIfAllowedLocal(userId!)) return;
+        rem = getIdkRemainingLocal(userId!);
+      }
     }
     if (rem < 0) return;
 
@@ -615,6 +652,12 @@ export function FlashcardGame({
 
     startPrefetchAndScheduleAdvance();
 
+    if (guestMode && userId) {
+      touchGuestFailedWord(userId, word);
+      onReviewChange?.();
+      return;
+    }
+
     void (async () => {
       try {
         await upsertFailedWord(word.id, "quiz");
@@ -627,6 +670,7 @@ export function FlashcardGame({
   }, [
     busy,
     demo,
+    guestMode,
     idkRemaining,
     mode,
     onReviewChange,
@@ -689,7 +733,7 @@ export function FlashcardGame({
 
       {loadError ? (
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-medium">Demo words aren’t ready</p>
+          <p className="font-medium">{guestDemoFetchPath ? "Demo words aren’t ready" : "Couldn’t load a word"}</p>
           <p className="mt-1 text-amber-900/90">{loadError}</p>
           <button
             type="button"
@@ -701,6 +745,15 @@ export function FlashcardGame({
         </div>
       ) : null}
 
+      {guestMode && !guestDemoFetchPath ? (
+        <p className="mb-4 text-xs text-zinc-500">
+          <Link href={`/login?next=${encodeURIComponent("/")}`} className="font-semibold text-[#1a5156] underline">
+            Sign in
+          </Link>{" "}
+          to save your score and review list across devices.
+        </p>
+      ) : null}
+
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-semibold tracking-wide text-zinc-600">
@@ -710,6 +763,9 @@ export function FlashcardGame({
             ) : null}
             {word && source === "demo" ? (
               <span className="font-medium text-zinc-400"> - Guest demo</span>
+            ) : null}
+            {word && guestMode && !guestDemoFetchPath ? (
+              <span className="font-medium text-zinc-400"> - Guest (play only)</span>
             ) : null}
           </div>
         </div>
