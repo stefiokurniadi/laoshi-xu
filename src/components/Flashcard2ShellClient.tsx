@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { QuestionMode, ReviewListRow, WordGameApiPayload } from "@/lib/types";
+import { loadGuestReviewRows } from "@/lib/guestReviewList";
 import { Navbar } from "@/components/Navbar";
 import { ReviewList } from "@/components/ReviewList";
 import { Flashcard2Game } from "@/components/Flashcard2Game";
@@ -29,10 +30,21 @@ export function Flashcard2ShellClient({
 }) {
   const [points, setPoints] = useState(initialFlashcardPoints);
   const [reviewEpoch, setReviewEpoch] = useState(0);
+  const [guestReviewRows, setGuestReviewRows] = useState<ReviewListRow[]>([]);
+
+  useLayoutEffect(() => {
+    if (!guest) return;
+    setGuestReviewRows(loadGuestReviewRows(userId));
+  }, [guest, userId]);
 
   useEffect(() => {
     setPoints(initialFlashcardPoints);
   }, [initialFlashcardPoints]);
+
+  useEffect(() => {
+    if (!guest || reviewEpoch < 1) return;
+    setGuestReviewRows(loadGuestReviewRows(userId));
+  }, [guest, reviewEpoch, userId]);
 
   const quizPeak = Math.max(quizHighestPoints, quizScore);
 
@@ -75,7 +87,7 @@ export function Flashcard2ShellClient({
           <aside id="review-list" className="min-h-0">
             <ReviewList
               guestMode={guest}
-              initialRows={initialReviewRows}
+              initialRows={guest ? guestReviewRows : initialReviewRows}
               userId={userId}
               refreshEpoch={reviewEpoch}
             />

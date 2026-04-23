@@ -3,6 +3,7 @@
 import { assertNotSuperadminPlay } from "@/lib/assertNotSuperadminPlay";
 import { isMissingDbObjectError } from "@/lib/supabaseMissingSchema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isMissingSessionAuthError } from "@/lib/supabaseAuthSession";
 import { isSuperadminEmail } from "@/lib/superadmin";
 
 export async function upsertFailedWord(wordId: number, source: "quiz" | "flashcard" = "quiz") {
@@ -53,7 +54,10 @@ export async function getFailedWords() {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
-  if (userError) throw userError;
+  if (userError) {
+    if (isMissingSessionAuthError(userError)) return [];
+    throw userError;
+  }
   if (!user) return [];
   if (isSuperadminEmail(user.email)) return [];
 

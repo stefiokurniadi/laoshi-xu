@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { isMissingDbObjectError } from "@/lib/supabaseMissingSchema";
+import { isMissingSessionAuthError } from "@/lib/supabaseAuthSession";
 import {
   isGapRow,
   type LeaderboardRow,
@@ -38,8 +39,18 @@ export async function getLeaderboardSnapshot(): Promise<LeaderboardSnapshot | nu
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
-  if (user && isSuperadminEmail(user.email)) {
+  if (userError) {
+    if (isMissingSessionAuthError(userError)) {
+      return { rows: [], showGap: false, unauthenticated: true };
+    }
+    throw userError;
+  }
+  if (!user) {
+    return { rows: [], showGap: false, unauthenticated: true };
+  }
+  if (isSuperadminEmail(user.email)) {
     return null;
   }
 

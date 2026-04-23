@@ -15,6 +15,8 @@ export type LeaderboardRow = LeaderboardPlayerRow | LeaderboardGapRow;
 export type LeaderboardSnapshot = {
   rows: LeaderboardRow[];
   showGap: boolean;
+  /** Set when the viewer is not signed in — RPC is skipped (it requires `auth.uid()`). */
+  unauthenticated?: boolean;
 };
 
 export function isGapRow(row: LeaderboardRow): row is LeaderboardGapRow {

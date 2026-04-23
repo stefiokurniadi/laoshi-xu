@@ -3,19 +3,25 @@ import { FlashcardShellClient } from "@/components/FlashcardShellClient";
 import { getTtsVoicePreset } from "@/lib/appSettings.server";
 
 export async function FlashcardShell({
+  guest = false,
   email,
   highestPoints,
   initialScore,
   userId,
 }: {
+  guest?: boolean;
   email?: string | null;
   highestPoints: number;
   initialScore: number;
   userId: string;
 }) {
-  const [initialRows, ttsVoicePreset] = await Promise.all([getFailedWords(), getTtsVoicePreset()]);
+  const [initialRows, ttsVoicePreset] = await Promise.all([
+    getFailedWords(),
+    guest ? Promise.resolve("auto" as const) : getTtsVoicePreset(),
+  ]);
   return (
     <FlashcardShellClient
+      guest={guest}
       email={email}
       highestPoints={highestPoints}
       initialScore={initialScore}

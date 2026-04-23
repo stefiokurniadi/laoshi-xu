@@ -2,8 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { ListChecks } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { ReviewListRow } from "@/lib/types";
+import { loadGuestReviewRows } from "@/lib/guestReviewList";
 import { Navbar } from "@/components/Navbar";
 import { FlashcardGameSkeleton } from "@/components/FlashcardGameSkeleton";
 
@@ -13,9 +14,11 @@ const FlashcardGame = dynamic(
 );
 import { LeaderboardLauncher } from "@/components/LeaderboardLauncher";
 import { ReviewList } from "@/components/ReviewList";
+import { GUEST_HOME_QUIZ_SCORE_KEY } from "@/lib/guestHomeQuiz";
 import type { TtsVoicePreset } from "@/lib/ttsVoice";
 
 export function FlashcardShellClient({
+  guest = false,
   email,
   highestPoints,
   initialScore,
@@ -23,6 +26,7 @@ export function FlashcardShellClient({
   ttsVoicePreset,
   userId,
 }: {
+  guest?: boolean;
   email?: string | null;
   highestPoints: number;
   initialScore: number;
@@ -35,19 +39,45 @@ export function FlashcardShellClient({
   const [peakDisplayed, setPeakDisplayed] = useState(() => Math.max(highestPoints, initialScore));
   const [delta, setDelta] = useState<number | null>(null);
   const [reviewEpoch, setReviewEpoch] = useState(0);
+  const [guestReviewRows, setGuestReviewRows] = useState<ReviewListRow[]>([]);
+
+  useLayoutEffect(() => {
+    if (!guest) return;
+    setGuestReviewRows(loadGuestReviewRows(userId));
+  }, [guest, userId]);
+
+  useEffect(() => {
+    if (!guest) return;
+    try {
+      const raw = window.localStorage.getItem(GUEST_HOME_QUIZ_SCORE_KEY);
+      const n = raw ? parseInt(raw, 10) : 0;
+      if (Number.isFinite(n)) {
+        setScore(n);
+        setPeakDisplayed((p) => Math.max(p, n));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [guest]);
 
   useEffect(() => {
     setPeakDisplayed((p) => Math.max(p, highestPoints, initialScore));
   }, [highestPoints, initialScore]);
 
+  useEffect(() => {
+    if (!guest || reviewEpoch < 1) return;
+    setGuestReviewRows(loadGuestReviewRows(userId));
+  }, [guest, reviewEpoch, userId]);
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-[#f0f6f7]">
       <Navbar
         email={email}
+        loginHref={guest ? `/login?next=${encodeURIComponent("/")}` : undefined}
         highestPoints={peakDisplayed}
         score={score}
         scoreDelta={delta}
-        leaderboardUserId={userId}
+        leaderboardUserId={guest ? null : userId}
         modeSwitcher={{
           currentLabel: "Quiz Mode",
           options: [
@@ -77,15 +107,18 @@ export function FlashcardShellClient({
                 Review
               </button>
             </div>
-            <div className="hidden shrink-0 lg:block">
-              <LeaderboardLauncher userId={userId} />
-            </div>
+            {!guest ? (
+              <div className="hidden shrink-0 lg:block">
+                <LeaderboardLauncher userId={userId} />
+              </div>
+            ) : null}
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="flex flex-col gap-6">
           <FlashcardGame
+            guestMode={guest}
             userId={userId}
             initialScore={score}
             ttsVoicePreset={ttsVoicePreset}
@@ -100,7 +133,12 @@ export function FlashcardShellClient({
           </div>
 
           <div className="flex flex-col gap-6">
-            <ReviewList initialRows={initialReviewRows} userId={userId} refreshEpoch={reviewEpoch} />
+            <ReviewList
+              guestMode={guest}
+              initialRows={guest ? guestReviewRows : initialReviewRows}
+              userId={userId}
+              refreshEpoch={reviewEpoch}
+            />
           </div>
         </div>
       </div>

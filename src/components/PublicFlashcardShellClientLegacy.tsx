@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Original narrow guest homepage (centered hero + demo API only).
+ * Kept for revert / QA — also routed at `/guest-quiz-demo`.
+ */
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
@@ -11,7 +15,7 @@ const FlashcardGame = dynamic(
   { loading: () => <FlashcardGameSkeleton />, ssr: true },
 );
 
-export function PublicFlashcardShellClient() {
+export function PublicFlashcardShellClientLegacy() {
   const [score, setScore] = useState(0);
   const [delta, setDelta] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);

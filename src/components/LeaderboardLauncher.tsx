@@ -110,6 +110,11 @@ function LeaderboardModal({
         setRows([]);
         return;
       }
+      if (snap.unauthenticated) {
+        setError("Sign in to view the leaderboard and your rank.");
+        setRows([]);
+        return;
+      }
       setRows(snap.rows);
     } catch (e) {
       console.error(e);

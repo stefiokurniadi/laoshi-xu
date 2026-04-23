@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HskWord, Option, QuestionMode, WordGameApiPayload } from "@/lib/types";
 import { buildOptions, getAnswerText, getPrompt, rotateMode, scoreDelta } from "@/lib/game";
 import { incrementFlashcardPoints } from "@/app/actions/flashcardPoints";
+import { removeGuestFailedWord, touchGuestFailedWord } from "@/lib/guestReviewList";
 import { incrementPoints } from "@/app/actions/profile";
 import { upsertFailedWord } from "@/app/actions/review";
 
@@ -279,7 +280,10 @@ export function Flashcard2Game({
     setStage("mcq");
     setReveal({ correctId: word.id, pickedKey: "no" });
     setMcqAnswered(false);
-    if (!guestMode) {
+    if (guestMode) {
+      touchGuestFailedWord(userId, word);
+      onReviewChange();
+    } else {
       void (async () => {
         try {
           await upsertFailedWord(word.id, "flashcard");
@@ -289,7 +293,7 @@ export function Flashcard2Game({
         }
       })();
     }
-  }, [busy, guestMode, mode, onReviewChange, word]);
+  }, [busy, guestMode, mode, onReviewChange, userId, word]);
 
   const onPickOption = useCallback(
     async (opt: Option) => {
@@ -304,7 +308,14 @@ export function Flashcard2Game({
 
       const delta = isCorrect ? 0 : scoreDelta(word.level, "wrong");
       void applyPointsDelta(delta);
-      if (!guestMode) {
+      if (guestMode) {
+        if (isCorrect) {
+          removeGuestFailedWord(userId, word.id);
+        } else {
+          touchGuestFailedWord(userId, word);
+        }
+        onReviewChange();
+      } else {
         void (async () => {
           try {
             await incrementPoints(0, mode);
@@ -315,7 +326,7 @@ export function Flashcard2Game({
       }
       scheduleAdvance();
     },
-    [applyPointsDelta, busy, guestMode, mcqAnswered, mode, scheduleAdvance, stage, word],
+    [applyPointsDelta, busy, guestMode, mcqAnswered, mode, onReviewChange, scheduleAdvance, stage, userId, word],
   );
 
   return (
@@ -329,7 +340,7 @@ export function Flashcard2Game({
               <Link href={`/login?next=${encodeURIComponent("/flashcard")}`} className="font-semibold text-[#1a5156] underline">
                 Sign in
               </Link>{" "}
-              to save flashcard points and your review list.
+              to save flashcard points and sync your review list to your account.
             </p>
           ) : null}
         </div>

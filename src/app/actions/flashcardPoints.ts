@@ -2,6 +2,7 @@
 
 import { assertNotSuperadminPlay } from "@/lib/assertNotSuperadminPlay";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isMissingSessionAuthError } from "@/lib/supabaseAuthSession";
 
 export async function getFlashcardPoints(): Promise<number> {
   const supabase = await createSupabaseServerClient();
@@ -9,7 +10,10 @@ export async function getFlashcardPoints(): Promise<number> {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
-  if (userError) throw userError;
+  if (userError) {
+    if (isMissingSessionAuthError(userError)) return 0;
+    throw userError;
+  }
   if (!user) return 0;
 
   const { data, error } = await supabase
