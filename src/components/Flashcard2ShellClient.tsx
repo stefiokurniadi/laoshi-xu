@@ -7,6 +7,7 @@ import { ReviewList } from "@/components/ReviewList";
 import { Flashcard2Game } from "@/components/Flashcard2Game";
 
 export function Flashcard2ShellClient({
+  guest = false,
   email,
   userId,
   quizScore,
@@ -16,7 +17,8 @@ export function Flashcard2ShellClient({
   initialFlashcardPayload,
   initialReviewRows,
 }: {
-  email: string;
+  guest?: boolean;
+  email: string | null;
   userId: string;
   quizScore: number;
   quizHighestPoints: number;
@@ -38,6 +40,7 @@ export function Flashcard2ShellClient({
     <div className="relative flex min-h-0 flex-1 flex-col bg-[#f0f6f7]">
       <Navbar
         email={email}
+        loginHref={guest ? `/login?next=${encodeURIComponent("/flashcard")}` : undefined}
         highestPoints={quizPeak}
         score={quizScore}
         scoreDelta={null}
@@ -59,6 +62,7 @@ export function Flashcard2ShellClient({
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.85fr]">
           <div className="flex flex-col gap-6">
             <Flashcard2Game
+              guestMode={guest}
               userId={userId}
               initialFlashcardPoints={points}
               initialPayload={initialFlashcardPayload}
@@ -69,7 +73,12 @@ export function Flashcard2ShellClient({
           </div>
 
           <aside id="review-list" className="min-h-0">
-            <ReviewList initialRows={initialReviewRows} userId={userId} refreshEpoch={reviewEpoch} />
+            <ReviewList
+              guestMode={guest}
+              initialRows={initialReviewRows}
+              userId={userId}
+              refreshEpoch={reviewEpoch}
+            />
           </aside>
         </div>
       </div>

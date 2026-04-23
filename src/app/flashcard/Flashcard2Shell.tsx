@@ -7,12 +7,14 @@ import { isSuperadminEmail } from "@/lib/superadmin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function Flashcard2Shell({
+  guest = false,
   email,
   userId,
   quizScore,
   quizHighestPoints,
 }: {
-  email: string;
+  guest?: boolean;
+  email: string | null;
   userId: string;
   quizScore: number;
   quizHighestPoints: number;
@@ -22,23 +24,22 @@ export async function Flashcard2Shell({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const firstCardPromise =
-    user && !isSuperadminEmail(user.email)
-      ? (async () => {
-          const initialMode = rotateMode(null);
-          try {
-            const payload = await getWordGamePayload({
-              supabase,
-              user,
-              requestMode: initialMode,
-              pointsSource: "flashcard",
-            });
-            return { initialMode, payload };
-          } catch {
-            return null;
-          }
-        })()
-      : Promise.resolve(null);
+  const firstCardPromise = (async () => {
+    const subject = guest ? null : user && !isSuperadminEmail(user.email) ? user : null;
+    if (!guest && !subject) return null;
+    const initialMode = rotateMode(null);
+    try {
+      const payload = await getWordGamePayload({
+        supabase,
+        user: subject,
+        requestMode: initialMode,
+        pointsSource: "flashcard",
+      });
+      return { initialMode, payload };
+    } catch {
+      return null;
+    }
+  })();
 
   const [initialRows, initialPoints, firstCard] = await Promise.all([
     getFailedWords(),
@@ -48,6 +49,7 @@ export async function Flashcard2Shell({
 
   return (
     <Flashcard2ShellClient
+      guest={guest}
       email={email}
       userId={userId}
       quizScore={quizScore}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HskWord, Option, QuestionMode, WordGameApiPayload } from "@/lib/types";
 import { buildOptions, getAnswerText, getPrompt, rotateMode, scoreDelta } from "@/lib/game";
@@ -20,6 +21,7 @@ function primaryAnswerLabelForMode(mode: QuestionMode): "Hanzi" | "English" {
 }
 
 export function Flashcard2Game({
+  guestMode = false,
   userId,
   initialFlashcardPoints,
   initialPayload = null,
@@ -27,6 +29,8 @@ export function Flashcard2Game({
   onPointsChange,
   onReviewChange,
 }: {
+  /** Anonymous play: local-only points, no review DB writes. */
+  guestMode?: boolean;
   userId: string;
   initialFlashcardPoints: number;
   /** First card from SSR so the client does not wait on /api/word for first paint. */
@@ -204,6 +208,7 @@ export function Flashcard2Game({
       const optimistic = pointsRef.current + delta;
       pointsRef.current = optimistic;
       onPointsChange(optimistic);
+      if (guestMode) return;
       try {
         const next = await incrementFlashcardPoints(delta);
         if (next !== pointsRef.current) {
@@ -214,7 +219,7 @@ export function Flashcard2Game({
         // Keep optimistic value; next refresh will reconcile.
       }
     },
-    [onPointsChange],
+    [guestMode, onPointsChange],
   );
 
   const onYesKnow = useCallback(async () => {
@@ -223,61 +228,68 @@ export function Flashcard2Game({
     setReveal({ correctId: word.id, pickedKey: "yes" });
     const delta = scoreDelta(word.level, "correct");
     void applyPointsDelta(delta);
-    void (async () => {
-      try {
-        await incrementPoints(0, mode);
-      } catch {
-        /* ignore */
-      }
-    })();
+    if (!guestMode) {
+      void (async () => {
+        try {
+          await incrementPoints(0, mode);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
     scheduleAdvance();
-  }, [applyPointsDelta, busy, mode, scheduleAdvance, word]);
+  }, [applyPointsDelta, busy, guestMode, mode, scheduleAdvance, word]);
 
   const onYesKnowPrimaryOnly = useCallback(async () => {
     if (!word || !mode || busy) return;
     setStage("reveal");
     setReveal({ correctId: word.id, pickedKey: "yesPrimaryOnly" });
     // Intentionally +0: user self-reports partial knowledge.
-    void (async () => {
-      try {
-        await incrementPoints(0, mode);
-      } catch {
-        /* ignore */
-      }
-    })();
+    if (!guestMode) {
+      void (async () => {
+        try {
+          await incrementPoints(0, mode);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
     scheduleAdvance();
-  }, [busy, mode, scheduleAdvance, word]);
+  }, [busy, guestMode, mode, scheduleAdvance, word]);
 
   const onYesKnowSecondaryOnly = useCallback(async () => {
     if (!word || !mode || busy) return;
     setStage("reveal");
     setReveal({ correctId: word.id, pickedKey: "yesSecondaryOnly" });
     // Intentionally +0: user self-reports partial knowledge.
-    void (async () => {
-      try {
-        await incrementPoints(0, mode);
-      } catch {
-        /* ignore */
-      }
-    })();
+    if (!guestMode) {
+      void (async () => {
+        try {
+          await incrementPoints(0, mode);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
     scheduleAdvance();
-  }, [busy, mode, scheduleAdvance, word]);
+  }, [busy, guestMode, mode, scheduleAdvance, word]);
 
   const onNoDontKnow = useCallback(async () => {
     if (!word || !mode || busy) return;
     setStage("mcq");
     setReveal({ correctId: word.id, pickedKey: "no" });
     setMcqAnswered(false);
-    // Immediately put it in the combined review list, tagged as flashcard.
-    void (async () => {
-      try {
-        await upsertFailedWord(word.id, "flashcard");
-        onReviewChange();
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, [busy, mode, onReviewChange, word]);
+    if (!guestMode) {
+      void (async () => {
+        try {
+          await upsertFailedWord(word.id, "flashcard");
+          onReviewChange();
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
+  }, [busy, guestMode, mode, onReviewChange, word]);
 
   const onPickOption = useCallback(
     async (opt: Option) => {
@@ -292,16 +304,18 @@ export function Flashcard2Game({
 
       const delta = isCorrect ? 0 : scoreDelta(word.level, "wrong");
       void applyPointsDelta(delta);
-      void (async () => {
-        try {
-          await incrementPoints(0, mode);
-        } catch {
-          /* ignore */
-        }
-      })();
+      if (!guestMode) {
+        void (async () => {
+          try {
+            await incrementPoints(0, mode);
+          } catch {
+            /* ignore */
+          }
+        })();
+      }
       scheduleAdvance();
     },
-    [applyPointsDelta, busy, mcqAnswered, mode, scheduleAdvance, stage, word],
+    [applyPointsDelta, busy, guestMode, mcqAnswered, mode, scheduleAdvance, stage, word],
   );
 
   return (
@@ -310,6 +324,14 @@ export function Flashcard2Game({
         <div>
           <div className="text-lg font-semibold text-zinc-900">Flashcard Mode</div>
           <p className="mt-1 text-sm text-zinc-600">Self-check your chinese vocab</p>
+          {guestMode ? (
+            <p className="mt-2 text-xs text-zinc-500">
+              <Link href={`/login?next=${encodeURIComponent("/flashcard")}`} className="font-semibold text-[#1a5156] underline">
+                Sign in
+              </Link>{" "}
+              to save flashcard points and your review list.
+            </p>
+          ) : null}
         </div>
       </div>
 
